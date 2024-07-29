@@ -1,25 +1,13 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/dist/types";
 
-const func: DeployFunction = async function ({
-  ethers,
-  getNamedAccounts,
-  deployments,
-  getChainId,
-}: HardhatRuntimeEnvironment) {
+const func: DeployFunction = async function ({ ethers, getNamedAccounts, deployments }: HardhatRuntimeEnvironment) {
   const { deploy } = deployments;
 
   const { deployer } = await getNamedAccounts();
 
-  const chainId = await getChainId();
-
-  if (!process.env.WNATIVE_ADDRESS) {
-    throw Error(`No WNATIVE_ADDRESS for chain #${chainId}!`);
-  }
-
-  if (!process.env.NATIVE_CURRENCY_LABEL) {
-    throw Error(`No NATIVE_CURRENCY_LABEL for chain #${chainId}!`);
-  }
+  // const chainId = await getChainId();
+  const WETH_SEPOLIA = "0xe8188160f0b8E4A2940A6B9779ed0FE9A2506dF7";
 
   function isAscii(str: string): boolean {
     return /^[\x00-\x7F]*$/.test(str);
@@ -34,7 +22,7 @@ const func: DeployFunction = async function ({
 
   const NFTDescriptor = await deployments.get("NFTDescriptor");
 
-  const nativeCurrencyLabelBytes = ethers.utils.formatBytes32String(process.env.NATIVE_CURRENCY_LABEL);
+  const nativeCurrencyLabelBytes = ethers.utils.formatBytes32String("ETH");
 
   console.log(
     "Deploying NonfungibleTokenPositionDescriptor... ",
@@ -42,13 +30,13 @@ const func: DeployFunction = async function ({
     nativeCurrencyLabelBytes,
     NFTDescriptor.address,
     {
-      args: [process.env.WNATIVE_ADDRESS, asciiStringToBytes32("ETH")],
+      args: [WETH_SEPOLIA, asciiStringToBytes32("ETH")],
     },
   );
 
   await deploy("NonfungibleTokenPositionDescriptor", {
     from: deployer,
-    args: [process.env.WNATIVE_ADDRESS, asciiStringToBytes32("ETH")],
+    args: [WETH_SEPOLIA, asciiStringToBytes32("ETH")],
     log: true,
     deterministicDeployment: false,
     libraries: {

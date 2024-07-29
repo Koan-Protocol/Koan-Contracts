@@ -1,34 +1,28 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/dist/types";
 
+// always update for deployments
+
+import corecontracts from "../../deployments/v3core/sepolia_11155111.json";
+
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { deployments, getNamedAccounts, getChainId } = hre;
+  const { deployments, getNamedAccounts } = hre;
   const { deploy } = deployments;
 
   const { deployer } = await getNamedAccounts();
-  const chainId = await getChainId();
+  // const chainId = await getChainId();
 
-  if (!process.env.WNATIVE_ADDRESS) {
-    throw Error(`No WNATIVE_ADDRESS for chain #${chainId}!`);
-  }
-
-  if (!process.env.FACTORY_ADDRESS) {
-    throw Error(`No FACTORY_ADDRESS for chain #${chainId}!`);
-  }
-
-  if (!process.env.NONFUNGIBLE_POSITION_MANAGER_ADDRESS) {
-    throw Error(`No NONFUNGIBLE_POSITION_MANAGER_ADDRESS for chain #${chainId}!`);
-  }
+  const WETH_SEPOLIA = "0xe8188160f0b8E4A2940A6B9779ed0FE9A2506dF7";
 
   const v3Migrator = await hre.artifacts.readArtifact("V3Migrator");
-
+  const NonfungiblePositionManager = await deployments.get("NonfungiblePositionManager");
   await deploy("V3Migrator", {
     from: deployer,
     contract: {
       bytecode: v3Migrator.bytecode,
       abi: v3Migrator.abi,
     },
-    args: [process.env.FACTORY_ADDRESS, process.env.WNATIVE_ADDRESS, process.env.NONFUNGIBLE_POSITION_MANAGER_ADDRESS],
+    args: [corecontracts.UniswapV3Factory, WETH_SEPOLIA, NonfungiblePositionManager.address],
     log: true,
     deterministicDeployment: false,
   });

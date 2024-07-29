@@ -18,11 +18,11 @@ import "./libraries/TokenRatioSortOrder.sol";
 contract NonfungibleTokenPositionDescriptor is
 	INonfungibleTokenPositionDescriptor
 {
-	address private constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
-	address private constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
-	address private constant USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
-	address private constant TBTC = 0x8dAEBADE922dF735c38C80C7eBD708Af50815fAa;
-	address private constant WBTC = 0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599;
+	address private constant DAI = 0x6b5C3fC0EdB93115dCA94221E6826dAaC296AA9c;
+	address private constant USDC = 0x65B02bE3Fa8B6009E513C85887aB4923Ba2A998d;
+	address private constant USDT = 0xcD47821BF5096914858e94EDFd4218B6f5Ab3635;
+	address private constant TBTC = 0x151e597537d84a1D4E1E8e5f1409846CC15C2446;
+	address private constant WBTC = 0xa8773c21db637d4cf87e7E6A05093D0052064957;
 
 	address public immutable WETH9;
 	/// @dev A null-terminated string

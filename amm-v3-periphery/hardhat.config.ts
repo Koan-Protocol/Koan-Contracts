@@ -64,8 +64,8 @@ const config: HardhatUserConfig = {
       "contracts/libraries/NFTDescriptor.sol": LOWEST_OPTIMIZER_COMPILER_SETTINGS,
     },
   },
-  // defaultNetwork: "baseSepolia",
-  defaultNetwork: "hardhat",
+  defaultNetwork: "sepolia",
+  // defaultNetwork: "hardhat",
   namedAccounts: {
     // deployer: {
     //   default: "0x261386C962c7f035E98C13271218eF5CBD09C47d",
@@ -99,6 +99,10 @@ const config: HardhatUserConfig = {
         url: `https://eth-mainnet.alchemyapi.io/v2/${providerApiKey}`,
         enabled: process.env.MAINNET_FORKING_ENABLED === "true",
       },
+    },
+    sepolia: {
+      url: `https://eth-sepolia.g.alchemy.com/v2/${providerApiKey}`,
+      accounts: [deployerPrivateKey!],
     },
     base: {
       url: "https://mainnet.base.org",
