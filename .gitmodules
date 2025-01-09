@@ -1,3 +1,6 @@
 [submodule "testnet-utils/lib/forge-std"]
 	path = testnet-utils/lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
+[submodule "testnet-utils/lib/openzeppelin-contracts"]
+	path = testnet-utils/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
