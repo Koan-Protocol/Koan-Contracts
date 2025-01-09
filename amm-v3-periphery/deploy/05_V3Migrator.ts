@@ -11,10 +11,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const { deployer } = await getNamedAccounts();
   // const chainId = await getChainId();
-
-  const WETH_SEPOLIA = "0xe8188160f0b8E4A2940A6B9779ed0FE9A2506dF7";
+  if (!process.env.WNATIVE_ADDRESS) {
+    throw Error(`No WNATIVE_ADDRESS for chain #}!`);
+  }
 
   const v3Migrator = await hre.artifacts.readArtifact("V3Migrator");
+
   const NonfungiblePositionManager = await deployments.get("NonfungiblePositionManager");
   await deploy("V3Migrator", {
     from: deployer,
@@ -22,7 +24,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       bytecode: v3Migrator.bytecode,
       abi: v3Migrator.abi,
     },
-    args: [corecontracts.UniswapV3Factory, WETH_SEPOLIA, NonfungiblePositionManager.address],
+    args: [corecontracts.UniswapV3Factory, process.env.WNATIVE_ADDRESS, NonfungiblePositionManager.address],
     log: true,
     deterministicDeployment: false,
   });

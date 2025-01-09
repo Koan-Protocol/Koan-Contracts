@@ -17,7 +17,11 @@ const func: DeployFunction = async function ({
 
   const chainId = await getChainId();
 
-  const WETH_SEPOLIA = "0xe8188160f0b8E4A2940A6B9779ed0FE9A2506dF7";
+  if (!process.env.WNATIVE_ADDRESS) {
+    throw Error(`No WNATIVE_ADDRESS for chain #${chainId}!`);
+  }
+
+  // const WETH_SEPOLIA = "0xe8188160f0b8E4A2940A6B9779ed0FE9A2506dF7";
 
   if (!deployments.get("NonfungibleTokenPositionDescriptor")) {
     throw Error(`No NonfungibleTokenPositionDescriptor for chain #${chainId}!`);
@@ -27,7 +31,7 @@ const func: DeployFunction = async function ({
 
   await deploy("NonfungiblePositionManager", {
     from: deployer,
-    args: [corecontracts.UniswapV3Factory, WETH_SEPOLIA, NonfungibleTokenPositionDescriptor.address],
+    args: [corecontracts.UniswapV3Factory, process.env.WNATIVE_ADDRESS, NonfungibleTokenPositionDescriptor.address],
     log: true,
     deterministicDeployment: false,
   });

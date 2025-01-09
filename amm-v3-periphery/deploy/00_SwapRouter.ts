@@ -3,7 +3,7 @@ import { DeployFunction } from "hardhat-deploy/dist/types";
 
 // always update for deployments
 
-import corecontracts from "../../deployments/v3core/sepolia_11155111.json";
+import corecontracts from "../../deployments/v3core/baseSepolia_84532.json";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts, getChainId } = hre;
@@ -16,9 +16,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     throw Error(`No WNATIVE_ADDRESS for chain #${chainId}!`);
   }
 
-  if (!process.env.FACTORY_ADDRESS) {
-    throw Error(`No FACTORY_ADDRESS for chain #${chainId}!`);
-  }
+  // if (!process.env.FACTORY_ADDRESS) {
+  //   throw Error(`No FACTORY_ADDRESS for chain #${chainId}!`);
+  // }
 
   const swapRouterArtifact = await hre.artifacts.readArtifact("SwapRouter");
 

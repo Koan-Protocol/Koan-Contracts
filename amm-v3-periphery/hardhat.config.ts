@@ -64,7 +64,7 @@ const config: HardhatUserConfig = {
       "contracts/libraries/NFTDescriptor.sol": LOWEST_OPTIMIZER_COMPILER_SETTINGS,
     },
   },
-  defaultNetwork: "sepolia",
+  defaultNetwork: "lisk-sepolia",
   // defaultNetwork: "hardhat",
   namedAccounts: {
     // deployer: {
@@ -103,6 +103,16 @@ const config: HardhatUserConfig = {
     sepolia: {
       url: `https://eth-sepolia.g.alchemy.com/v2/${providerApiKey}`,
       accounts: [deployerPrivateKey!],
+    },
+    "lisk-sepolia": {
+      url: "https://rpc.sepolia-api.lisk.com",
+      accounts: [deployerPrivateKey!],
+      gasPrice: 1000000000,
+    },
+    lisk: {
+      url: "https://rpc.api.lisk.com",
+      accounts: [deployerPrivateKey!],
+      gasPrice: 1000000000,
     },
     base: {
       url: "https://mainnet.base.org",

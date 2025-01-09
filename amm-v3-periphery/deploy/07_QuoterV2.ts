@@ -1,5 +1,6 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/dist/types";
+import corecontracts from "../../deployments/v3core/baseSepolia_84532.json";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts, getChainId } = hre;
@@ -12,9 +13,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     throw Error(`No WNATIVE_ADDRESS for chain #${chainId}!`);
   }
 
-  if (!process.env.FACTORY_ADDRESS) {
-    throw Error(`No FACTORY_ADDRESS for chain #${chainId}!`);
-  }
+  // if (!process.env.FACTORY_ADDRESS) {
+  //   throw Error(`No FACTORY_ADDRESS for chain #${chainId}!`);
+  // }
 
   const quoterV2Artifact = await hre.artifacts.readArtifact("QuoterV2");
 
@@ -24,7 +25,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       bytecode: quoterV2Artifact.bytecode,
       abi: quoterV2Artifact.abi,
     },
-    args: [process.env.FACTORY_ADDRESS, process.env.WNATIVE_ADDRESS],
+    args: [corecontracts.UniswapV3Factory, process.env.WNATIVE_ADDRESS],
     log: true,
     deterministicDeployment: false,
   });

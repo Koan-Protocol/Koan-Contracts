@@ -7,8 +7,9 @@ const func: DeployFunction = async function ({ ethers, getNamedAccounts, deploym
   const { deployer } = await getNamedAccounts();
 
   // const chainId = await getChainId();
-  const WETH_SEPOLIA = "0xe8188160f0b8E4A2940A6B9779ed0FE9A2506dF7";
-
+  if (!process.env.WNATIVE_ADDRESS) {
+    throw Error(`No WNATIVE_ADDRESS for chain #!`);
+  }
   function isAscii(str: string): boolean {
     return /^[\x00-\x7F]*$/.test(str);
   }
@@ -30,13 +31,13 @@ const func: DeployFunction = async function ({ ethers, getNamedAccounts, deploym
     nativeCurrencyLabelBytes,
     NFTDescriptor.address,
     {
-      args: [WETH_SEPOLIA, asciiStringToBytes32("ETH")],
+      args: [process.env.WNATIVE_ADDRESS, asciiStringToBytes32("ETH")],
     },
   );
 
   await deploy("NonfungibleTokenPositionDescriptor", {
     from: deployer,
-    args: [WETH_SEPOLIA, asciiStringToBytes32("ETH")],
+    args: [process.env.WNATIVE_ADDRESS, asciiStringToBytes32("ETH")],
     log: true,
     deterministicDeployment: false,
     libraries: {

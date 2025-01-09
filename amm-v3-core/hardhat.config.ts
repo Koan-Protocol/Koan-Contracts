@@ -27,7 +27,7 @@ const config: HardhatUserConfig = {
       },
     },
   },
-  defaultNetwork: "sepolia",
+  defaultNetwork: "lisk-sepolia",
   // defaultNetwork: "hardhat",
   namedAccounts: {
     // deployer: {
@@ -82,6 +82,16 @@ const config: HardhatUserConfig = {
           apiKey: basescanApiKey,
         },
       },
+    },
+    "lisk-sepolia": {
+      url: "https://rpc.sepolia-api.lisk.com",
+      accounts: [deployerPrivateKey!],
+      gasPrice: 1000000000,
+    },
+    lisk: {
+      url: "https://rpc.api.lisk.com",
+      accounts: [deployerPrivateKey!],
+      gasPrice: 1000000000,
     },
     sepolia: {
       url: `https://eth-sepolia.g.alchemy.com/v2/${providerApiKey}`,

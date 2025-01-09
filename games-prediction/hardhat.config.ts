@@ -114,6 +114,16 @@ const config: HardhatUserConfig = {
         },
       },
     },
+     "lisk-sepolia": {
+      url: "https://rpc.sepolia-api.lisk.com",
+      accounts: [deployerPrivateKey!],
+      gasPrice: 1000000000,
+    },
+    lisk: {
+      url: "https://rpc.api.lisk.com",
+      accounts: [deployerPrivateKey!],
+      gasPrice: 1000000000,
+    },
     baseSepolia: {
       url: "https://sepolia.base.org",
       accounts: [deployerPrivateKey!],
