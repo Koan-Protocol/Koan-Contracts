@@ -3,8 +3,9 @@ import { DeployFunction } from "hardhat-deploy/dist/types";
 
 // always update for deployments
 
-import corecontracts from "../../deployments/v3core/baseSepolia_84532.json";
+// import corecontracts from "../../deployments/v3core/baseSepolia_84532.json";
 
+const FACTORY_ADDRESS = "0x4E02A5e71197fAE4925b23CEdc35D987a4409DB0";
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts, getChainId } = hre;
   const { deploy } = deployments;
@@ -28,7 +29,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       bytecode: swapRouterArtifact.bytecode,
       abi: swapRouterArtifact.abi,
     },
-    args: [corecontracts.UniswapV3Factory, process.env.WNATIVE_ADDRESS],
+    args: [FACTORY_ADDRESS, process.env.WNATIVE_ADDRESS],
     log: true,
     deterministicDeployment: false,
   });

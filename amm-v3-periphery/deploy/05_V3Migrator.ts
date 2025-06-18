@@ -3,8 +3,9 @@ import { DeployFunction } from "hardhat-deploy/dist/types";
 
 // always update for deployments
 
-import corecontracts from "../../deployments/v3core/sepolia_11155111.json";
+// import corecontracts from "../../deployments/v3core/sepolia_11155111.json";
 
+const FACTORY_ADDRESS = "0x4E02A5e71197fAE4925b23CEdc35D987a4409DB0";
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts } = hre;
   const { deploy } = deployments;
@@ -24,7 +25,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       bytecode: v3Migrator.bytecode,
       abi: v3Migrator.abi,
     },
-    args: [corecontracts.UniswapV3Factory, process.env.WNATIVE_ADDRESS, NonfungiblePositionManager.address],
+    args: [FACTORY_ADDRESS, process.env.WNATIVE_ADDRESS, NonfungiblePositionManager.address],
     log: true,
     deterministicDeployment: false,
   });

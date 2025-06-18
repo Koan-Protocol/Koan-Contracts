@@ -8,7 +8,7 @@ import "@matterlabs/hardhat-zksync-verify";
 
 const providerApiKey = process.env.ALCHEMY_API_KEY || "oKxs-03sij-U_N0iOlrSsZFr29-IqbuF";
 const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY;
-const etherscanApiKey = process.env.ETHERSCAN_API_KEY;
+// const etherscanApiKey = process.env.ETHERSCAN_API_KEY;
 const basescanApiKey = process.env.BASESCAN_API_KEY;
 
 const config: HardhatUserConfig = {
@@ -27,7 +27,7 @@ const config: HardhatUserConfig = {
       },
     },
   },
-  defaultNetwork: "lisk-sepolia",
+  defaultNetwork: "baseSepolia",
   // defaultNetwork: "hardhat",
   namedAccounts: {
     // deployer: {
@@ -87,6 +87,12 @@ const config: HardhatUserConfig = {
       url: "https://rpc.sepolia-api.lisk.com",
       accounts: [deployerPrivateKey!],
       gasPrice: 1000000000,
+      verify: {
+        etherscan: {
+          apiKey: "123",
+          apiUrl: "https://sepolia-blockscout.lisk.com/api",
+        },
+      },
     },
     lisk: {
       url: "https://rpc.api.lisk.com",
@@ -100,7 +106,8 @@ const config: HardhatUserConfig = {
   },
   verify: {
     etherscan: {
-      apiKey: `${etherscanApiKey}`,
+      // apiKey: `${etherscanApiKey}`,
+      apiKey: "123",
     },
   },
 };
