@@ -22,5 +22,3 @@ HardhatRuntimeEnvironment) {
 func.tags = ["UniswapV3Factory"];
 
 export default func;
-
-

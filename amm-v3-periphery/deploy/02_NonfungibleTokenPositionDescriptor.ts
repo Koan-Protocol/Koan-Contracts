@@ -1,15 +1,18 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/dist/types";
 
+const WNATIVE_ADDRESS = "0x4200000000000000000000000000000000000006";
+
 const func: DeployFunction = async function ({ ethers, getNamedAccounts, deployments }: HardhatRuntimeEnvironment) {
   const { deploy } = deployments;
 
   const { deployer } = await getNamedAccounts();
 
   // const chainId = await getChainId();
-  if (!process.env.WNATIVE_ADDRESS) {
-    throw Error(`No WNATIVE_ADDRESS for chain #!`);
-  }
+  // if (!process.env.WNATIVE_ADDRESS) {
+  //   throw Error(`No WNATIVE_ADDRESS for chain #!`);
+  // }
+
   function isAscii(str: string): boolean {
     return /^[\x00-\x7F]*$/.test(str);
   }
@@ -31,13 +34,13 @@ const func: DeployFunction = async function ({ ethers, getNamedAccounts, deploym
     nativeCurrencyLabelBytes,
     NFTDescriptor.address,
     {
-      args: [process.env.WNATIVE_ADDRESS, asciiStringToBytes32("ETH")],
+      args: [WNATIVE_ADDRESS, asciiStringToBytes32("ETH")],
     },
   );
 
   await deploy("NonfungibleTokenPositionDescriptor", {
     from: deployer,
-    args: [process.env.WNATIVE_ADDRESS, asciiStringToBytes32("ETH")],
+    args: [WNATIVE_ADDRESS, asciiStringToBytes32("ETH")],
     log: true,
     deterministicDeployment: false,
     libraries: {

@@ -64,7 +64,7 @@ const config: HardhatUserConfig = {
       "contracts/libraries/NFTDescriptor.sol": LOWEST_OPTIMIZER_COMPILER_SETTINGS,
     },
   },
-  defaultNetwork: "baseSepolia",
+  defaultNetwork: "lisk-sepolia",
   // defaultNetwork: "hardhat",
   namedAccounts: {
     // deployer: {

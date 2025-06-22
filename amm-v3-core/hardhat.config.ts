@@ -27,7 +27,7 @@ const config: HardhatUserConfig = {
       },
     },
   },
-  defaultNetwork: "baseSepolia",
+  defaultNetwork: "lisk-sepolia",
   // defaultNetwork: "hardhat",
   namedAccounts: {
     // deployer: {
