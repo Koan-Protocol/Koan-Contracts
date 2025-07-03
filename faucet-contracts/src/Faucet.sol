@@ -70,6 +70,7 @@ contract KoanprotocolFaucet is Ownable, ReentrancyGuard, Pausable {
            _claimToken(currentToken);
         }
     }
+
     function _claimToken(address _token) internal whenNotPaused returns (bool) {
         require(isSupportedToken[_token], "Token is not supported");
 
@@ -197,5 +198,66 @@ contract KoanprotocolFaucet is Ownable, ReentrancyGuard, Pausable {
         uint256 amount = IERC20(_token).balanceOf(address(this));
         require(amount > 0, "KoanFaucet: No tokens to send out.");
         IERC20(_token).transfer(msg.sender, amount);
+    }
+
+    function canClaimAll(address userAddress) external view returns (bool[] memory) {
+        require(userAddress != address(0), "Invalid user address");
+        require(!bannedUsers[userAddress], "User is banned");
+        
+        bool[] memory canClaim = new bool[](supportedTokens.length);
+        
+        for (uint i = 0; i < supportedTokens.length; i++) {
+            address token = supportedTokens[i];
+            bool canClaimToken = true;
+            if (!isSupportedToken[token]) {
+                canClaimToken = false;
+            }
+            else if (IERC20(token).balanceOf(userAddress) >= minUserBalanceForToken[token]) {
+                canClaimToken = false;
+            }
+            else if (block.timestamp < userFaucetData[userAddress][token].nextClaimTime) {
+                canClaimToken = false;
+
+            else if (IERC20(token).balanceOf(address(this)) < faucetAmountPerToken[token]) {
+                canClaimToken = false;
+            }
+            
+            canClaim[i] = canClaimToken;
+        }
+        
+        return canClaim;
+    }
+
+    function canClaimOne(address userAddress, address tokenAddress) external view returns (bool canClaim) {
+        require(userAddress != address(0), "Invalid user address");
+        require(tokenAddress != address(0), "Invalid token address");
+        
+      
+        canClaim = false;
+        
+      
+        if (bannedUsers[userAddress]) {
+            return false;
+        }
+        
+        if (!isSupportedToken[tokenAddress]) {
+            return false;
+        }
+        
+        
+        if (IERC20(tokenAddress).balanceOf(userAddress) >= minUserBalanceForToken[tokenAddress]) {
+            return false;
+        }
+        
+        if (block.timestamp < userFaucetData[userAddress][tokenAddress].nextClaimTime) {
+            return false;
+        }
+        
+        if (IERC20(tokenAddress).balanceOf(address(this)) < faucetAmountPerToken[tokenAddress]) {
+            return false;
+        }
+        
+       
+        return true;
     }
 }
