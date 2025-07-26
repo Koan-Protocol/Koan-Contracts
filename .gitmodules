@@ -10,3 +10,12 @@
 [submodule "faucet-contracts/lib/openzeppelin-contracts"]
 	path = faucet-contracts/lib/openzeppelin-contracts
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "amm-v3-positio-helper/lib/forge-std"]
+	path = amm-v3-positio-helper/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+[submodule "amm-v3-position-helper/lib/v3-periphery"]
+	path = amm-v3-position-helper/lib/v3-periphery
+	url = https://github.com/Uniswap/v3-periphery
+[submodule "amm-v3-position-helper/lib/openzeppelin-contracts"]
+	path = amm-v3-position-helper/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
