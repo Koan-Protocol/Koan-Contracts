@@ -12,6 +12,7 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
  * 1. users to claim specific tokens or all supported tokens based on eligibility criteria.
  * 2. admin functionalities for managing tokens and users.
  */
+
 contract KoanprotocolFaucet is Ownable, ReentrancyGuard, Pausable {
     struct UserFaucetData {
         uint256 totalDrippedAmount; // Total amount claimed
@@ -67,10 +68,9 @@ contract KoanprotocolFaucet is Ownable, ReentrancyGuard, Pausable {
     function claimAllSupportedTokens() external notBanned nonReentrant {
         for (uint i = 0; i < supportedTokens.length; i++) {
             address currentToken = supportedTokens[i];
-           _claimToken(currentToken);
+            _claimToken(currentToken);
         }
     }
-
     function _claimToken(address _token) internal whenNotPaused returns (bool) {
         require(isSupportedToken[_token], "Token is not supported");
 
