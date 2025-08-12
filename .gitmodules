@@ -22,3 +22,30 @@
 [submodule "amm-v3-position-helper/lib/v3-core"]
 	path = amm-v3-position-helper/lib/v3-core
 	url = https://github.com/uniswap/v3-core
+[submodule "games-contracts/prediction-game/lib/forge-std"]
+	path = games-contracts/prediction-game/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+[submodule "games-contracts/lottery-game/lib/forge-std"]
+	path = games-contracts/lottery-game/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+[submodule "games-contracts/foundry-template/lib/forge-std"]
+	path = games-contracts/foundry-template/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+[submodule "games-contracts/foundry-template/lib/chainlink-brownie-contracts"]
+	path = games-contracts/foundry-template/lib/chainlink-brownie-contracts
+	url = https://github.com/smartcontractkit/chainlink-brownie-contracts
+[submodule "games-contracts/foundry-template/lib/openzeppelin-contracts"]
+	path = games-contracts/foundry-template/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "games-contracts/lottery-game/lib/chainlink-brownie-contracts"]
+	path = games-contracts/lottery-game/lib/chainlink-brownie-contracts
+	url = https://github.com/smartcontractkit/chainlink-brownie-contracts
+[submodule "games-contracts/prediction-game/lib/chainlink-brownie-contracts"]
+	path = games-contracts/prediction-game/lib/chainlink-brownie-contracts
+	url = https://github.com/smartcontractkit/chainlink-brownie-contracts
+[submodule "games-contracts/lottery-game/lib/openzeppelin-contracts"]
+	path = games-contracts/lottery-game/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "games-contracts/prediction-game/lib/openzeppelin-contracts"]
+	path = games-contracts/prediction-game/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
