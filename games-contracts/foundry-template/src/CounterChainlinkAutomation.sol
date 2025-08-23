@@ -13,7 +13,7 @@ contract Counter is AutomationCompatibleInterface {
 
     uint256 public lastTimeStamp;
 
-    mapping(uint256 => address ) public lastCounterUpdate;
+    mapping(uint256 => address) public lastCounterUpdate;
 
     constructor() {
         interval = 120;

@@ -15,7 +15,7 @@ import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/Ag
 contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    IERC20 public immutable token; // Prediction token
+   IERC20 public immutable token; // Prediction token 
 
     AggregatorV3Interface public oracle;
 

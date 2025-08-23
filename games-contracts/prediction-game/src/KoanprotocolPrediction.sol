@@ -6,9 +6,14 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
+
+    AggregatorV3Interface public oracle;
+
+    IERC20 public immutable predictionToken;
 
     uint256 public genesisLockOnce = 0;
     uint256 public genesisStartOnce = 0;
@@ -118,6 +123,42 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
         _;
     }
 
+    /**
+     * @notice Constructor
+     * @param _token: prediction token
+     * @param _oracleAddress: oracle address
+     * @param _adminAddress: admin address
+     * @param _operatorAddress: operator address
+     * @param _intervalSeconds: number of time within an interval
+     * @param _bufferSeconds: buffer of time for resolution of price
+     * @param _minBetAmount: minimum bet amounts (in wei)
+     * @param _oracleUpdateAllowance: oracle update allowance
+     * @param _treasuryFee: treasury fee (1000 = 10%)
+     */
+    constructor(
+        address _token,
+        address _oracleAddress,
+        address _adminAddress,
+        address _operatorAddress,
+        uint256 _intervalSeconds,
+        uint256 _bufferSeconds,
+        uint256 _minBetAmount,
+        uint256 _oracleUpdateAllowance,
+        uint256 _treasuryFee
+    ) Ownable(_adminAddress) {
+        require(_treasuryFee <= MAX_TREASURY_FEE, "Treasury fee too high");
+
+        predictionToken = IERC20(_token);
+        oracle = AggregatorV3Interface(_oracleAddress);
+        // adminAddress = _adminAddress;
+        // operatorAddress = _operatorAddress;
+        // intervalSeconds = _intervalSeconds;
+        // bufferSeconds = _bufferSeconds;
+        // minBetAmount = _minBetAmount;
+        // oracleUpdateAllowance = _oracleUpdateAllowance;
+        // treasuryFee = _treasuryFee;
+    }
+
     // function betBear(
     //     uint256 epoch,
     //     uint256 _amount
@@ -150,17 +191,39 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
     // }
 
     /**
+     * @notice Lock genesis round
+     * @dev Callable by operator
+     */
+
+    function genesisLockRound() external whenNotPaused onlyOperator {
+        require(
+            genesisStartOnce > 0,
+            "Can only run after genesisStartRound is triggered"
+        );
+        require(genesisLockOnce == 0, "Can only run genesisLockRound once");
+
+        (uint80 currentRoundId, int256 currentPrice) = _getPriceFromOracle();
+
+        oracleLatestRoundId = uint256(currentRoundId);
+
+        _safeLockRound(currentEpoch, currentRoundId, currentPrice);
+
+        currentEpoch = currentEpoch + 1;
+        _startRound(currentEpoch);
+        genesisLockOnce = block.timestamp;
+    }
+
+    /**
      * @notice Start genesis round
      * @dev Callable by admin or operator
      */
     function genesisStartRound() external whenNotPaused onlyOperator {
-        require(!genesisStartOnce, "Can only run genesisStartRound once");
+        require(genesisStartOnce == 0, "Can only run genesisStartRound once");
 
         currentEpoch = currentEpoch + 1;
         _startRound(currentEpoch);
-        genesisStartOnce = true;
+        genesisStartOnce = block.timestamp;
     }
-
 
     /**
      * @notice End round
@@ -173,8 +236,14 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
         uint256 roundId,
         int256 price
     ) internal {
-        require(rounds[epoch].lockTimestamp != 0, "Can only end round after round has locked");
-        require(block.timestamp >= rounds[epoch].closeTimestamp, "Can only end round after closeTimestamp");
+        require(
+            rounds[epoch].lockTimestamp != 0,
+            "Can only end round after round has locked"
+        );
+        require(
+            block.timestamp >= rounds[epoch].closeTimestamp,
+            "Can only end round after closeTimestamp"
+        );
         require(
             block.timestamp <= rounds[epoch].closeTimestamp + bufferSeconds,
             "Can only end round within bufferSeconds"
@@ -198,8 +267,14 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
         uint256 roundId,
         int256 price
     ) internal {
-        require(rounds[epoch].startTimestamp != 0, "Can only lock round after round has started");
-        require(block.timestamp >= rounds[epoch].lockTimestamp, "Can only lock round after lockTimestamp");
+        require(
+            rounds[epoch].startTimestamp != 0,
+            "Can only lock round after round has started"
+        );
+        require(
+            block.timestamp >= rounds[epoch].lockTimestamp,
+            "Can only lock round after lockTimestamp"
+        );
         require(
             block.timestamp <= rounds[epoch].lockTimestamp + bufferSeconds,
             "Can only lock round within bufferSeconds"
@@ -212,7 +287,6 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
         emit LockRound(epoch, roundId, round.lockPrice);
     }
 
-
     /**
      * @notice Start round
      * Previous round n-2 must end
@@ -220,7 +294,7 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      */
     function _safeStartRound(uint256 epoch) internal {
         require(
-            genesisStartOnce > 0,
+            genesisStartOnce == 0,
             "Can only run after genesisStartRound is triggered"
         );
         require(
@@ -250,8 +324,40 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
         emit StartRound(epoch);
     }
 
-    
-       /**
+    /**
+     * @notice Determine if a round is valid for receiving bets
+     * Round must have started and locked
+     * Current timestamp must be within startTimestamp and closeTimestamp
+     */
+
+    function _bettable(uint256 epoch) internal view returns (bool) {
+        return
+            rounds[epoch].startTimestamp != 0 &&
+            rounds[epoch].lockTimestamp != 0 &&
+            block.timestamp > rounds[epoch].startTimestamp &&
+            block.timestamp < rounds[epoch].lockTimestamp;
+    }
+
+    /**
+     * @notice Get latest recorded price from oracle
+     * If it falls below allowed buffer or has not updated, it would be invalid.
+     */
+    function _getPriceFromOracle() internal view returns (uint80, int256) {
+        uint256 leastAllowedTimestamp = block.timestamp + oracleUpdateAllowance;
+        (uint80 roundId, int256 price, , uint256 timestamp, ) = oracle
+            .latestRoundData();
+        require(
+            timestamp <= leastAllowedTimestamp,
+            "Oracle update exceeded max timestamp allowance"
+        );
+        require(
+            uint256(roundId) > oracleLatestRoundId,
+            "Oracle update roundId must be larger than oracleLatestRoundId"
+        );
+        return (roundId, price);
+    }
+
+    /**
      * @notice Returns true if `account` is a contract.
      * @param account: account address
      */
