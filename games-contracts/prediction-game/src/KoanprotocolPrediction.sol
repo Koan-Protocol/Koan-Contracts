@@ -1,38 +1,33 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
-pragma abicoder v2;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.13;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
-/**
- * @title PancakePredictionV3
- */
 contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    IERC20 public immutable token; // Prediction token
-
     AggregatorV3Interface public oracle;
 
-    bool public genesisLockOnce = false;
-    bool public genesisStartOnce = false;
+    IERC20 public immutable predictionToken;
 
-    address public adminAddress; // address of the admin
-    address public operatorAddress; // address of the operator
+    uint256 public genesisLockOnce = 0;
+    uint256 public genesisStartOnce = 0;
 
-    uint256 public bufferSeconds; // number of seconds for valid execution of a prediction round
-    uint256 public intervalSeconds; // interval in seconds between two prediction rounds
+    address public operatorAddress;
+
+    uint256 public bufferSeconds;
+    uint256 public intervalSeconds;
 
     uint256 public minBetAmount; // minimum betting amount (denominated in wei)
     uint256 public treasuryFee; // treasury rate (e.g. 200 = 2%, 150 = 1.50%)
     uint256 public treasuryAmount; // treasury amount that was not claimed
 
-    uint256 public currentEpoch; // current epoch for prediction round
+    uint256 public currentEpoch;
 
     uint256 public oracleLatestRoundId; // converted from uint80 (Chainlink)
     uint256 public oracleUpdateAllowance; // seconds
@@ -68,17 +63,36 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
     struct BetInfo {
         Position position;
         uint256 amount;
-        bool claimed; // default false
+        bool claimed;
     }
 
-    event BetBear(address indexed sender, uint256 indexed epoch, uint256 amount);
-    event BetBull(address indexed sender, uint256 indexed epoch, uint256 amount);
+    event BetBear(
+        address indexed sender,
+        uint256 indexed epoch,
+        uint256 amount
+    );
+    event BetBull(
+        address indexed sender,
+        uint256 indexed epoch,
+        uint256 amount
+    );
     event Claim(address indexed sender, uint256 indexed epoch, uint256 amount);
-    event EndRound(uint256 indexed epoch, uint256 indexed roundId, int256 price);
-    event LockRound(uint256 indexed epoch, uint256 indexed roundId, int256 price);
+    event EndRound(
+        uint256 indexed epoch,
+        uint256 indexed roundId,
+        int256 price
+    );
+    event LockRound(
+        uint256 indexed epoch,
+        uint256 indexed roundId,
+        int256 price
+    );
 
     event NewAdminAddress(address admin);
-    event NewBufferAndIntervalSeconds(uint256 bufferSeconds, uint256 intervalSeconds);
+    event NewBufferAndIntervalSeconds(
+        uint256 bufferSeconds,
+        uint256 intervalSeconds
+    );
     event NewMinBetAmount(uint256 indexed epoch, uint256 minBetAmount);
     event NewTreasuryFee(uint256 indexed epoch, uint256 treasuryFee);
     event NewOperatorAddress(address operator);
@@ -97,16 +111,6 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
     event TokenRecovery(address indexed token, uint256 amount);
     event TreasuryClaim(uint256 amount);
     event Unpause(uint256 indexed epoch);
-
-    modifier onlyAdmin() {
-        require(msg.sender == adminAddress, "Not admin");
-        _;
-    }
-
-    modifier onlyAdminOrOperator() {
-        require(msg.sender == adminAddress || msg.sender == operatorAddress, "Not operator/admin");
-        _;
-    }
 
     modifier onlyOperator() {
         require(msg.sender == operatorAddress, "Not operator");
@@ -132,7 +136,7 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      * @param _treasuryFee: treasury fee (1000 = 10%)
      */
     constructor(
-        IERC20 _token,
+        address _token,
         address _oracleAddress,
         address _adminAddress,
         address _operatorAddress,
@@ -141,12 +145,11 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
         uint256 _minBetAmount,
         uint256 _oracleUpdateAllowance,
         uint256 _treasuryFee
-    ) {
+    ) Ownable(_adminAddress) {
         require(_treasuryFee <= MAX_TREASURY_FEE, "Treasury fee too high");
 
-        token = _token;
+        predictionToken = IERC20(_token);
         oracle = AggregatorV3Interface(_oracleAddress);
-        adminAddress = _adminAddress;
         operatorAddress = _operatorAddress;
         intervalSeconds = _intervalSeconds;
         bufferSeconds = _bufferSeconds;
@@ -155,17 +158,22 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
         treasuryFee = _treasuryFee;
     }
 
-    /**
-     * @notice Bet bear position
-     * @param epoch: epoch
-     */
-    function betBear(uint256 epoch, uint256 _amount) external whenNotPaused nonReentrant notContract {
+    function betBear(
+        uint256 epoch,
+        uint256 _amount
+    ) external whenNotPaused nonReentrant notContract {
         require(epoch == currentEpoch, "Bet is too early/late");
         require(_bettable(epoch), "Round not bettable");
-        require(_amount >= minBetAmount, "Bet amount must be greater than minBetAmount");
-        require(ledger[epoch][msg.sender].amount == 0, "Can only bet once per round");
+        require(
+            _amount >= minBetAmount,
+            "Bet amount must be greater than minBetAmount"
+        );
+        require(
+            ledger[epoch][msg.sender].amount == 0,
+            "Can only bet once per round"
+        );
 
-        token.safeTransferFrom(msg.sender, address(this), _amount);
+        predictionToken.safeTransferFrom(msg.sender, address(this), _amount);
         // Update round data
         uint256 amount = _amount;
         Round storage round = rounds[epoch];
@@ -185,13 +193,22 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      * @notice Bet bull position
      * @param epoch: epoch
      */
-    function betBull(uint256 epoch, uint256 _amount) external whenNotPaused nonReentrant notContract {
+    function betBull(
+        uint256 epoch,
+        uint256 _amount
+    ) external whenNotPaused nonReentrant notContract {
         require(epoch == currentEpoch, "Bet is too early/late");
         require(_bettable(epoch), "Round not bettable");
-        require(_amount >= minBetAmount, "Bet amount must be greater than minBetAmount");
-        require(ledger[epoch][msg.sender].amount == 0, "Can only bet once per round");
+        require(
+            _amount >= minBetAmount,
+            "Bet amount must be greater than minBetAmount"
+        );
+        require(
+            ledger[epoch][msg.sender].amount == 0,
+            "Can only bet once per round"
+        );
 
-        token.safeTransferFrom(msg.sender, address(this), _amount);
+        predictionToken.safeTransferFrom(msg.sender, address(this), _amount);
         // Update round data
         uint256 amount = _amount;
         Round storage round = rounds[epoch];
@@ -211,24 +228,41 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      * @notice Claim reward for an array of epochs
      * @param epochs: array of epochs
      */
-    function claim(uint256[] calldata epochs) external nonReentrant notContract {
+    function claim(
+        uint256[] calldata epochs
+    ) external nonReentrant notContract {
         uint256 reward; // Initializes reward
 
         for (uint256 i = 0; i < epochs.length; i++) {
-            require(rounds[epochs[i]].startTimestamp != 0, "Round has not started");
-            require(block.timestamp > rounds[epochs[i]].closeTimestamp, "Round has not ended");
+            require(
+                rounds[epochs[i]].startTimestamp != 0,
+                "Round has not started"
+            );
+            require(
+                block.timestamp > rounds[epochs[i]].closeTimestamp,
+                "Round has not ended"
+            );
 
             uint256 addedReward = 0;
 
             // Round valid, claim rewards
             if (rounds[epochs[i]].oracleCalled) {
-                require(claimable(epochs[i], msg.sender), "Not eligible for claim");
+                require(
+                    claimable(epochs[i], msg.sender),
+                    "Not eligible for claim"
+                );
                 Round memory round = rounds[epochs[i]];
-                addedReward = (ledger[epochs[i]][msg.sender].amount * round.rewardAmount) / round.rewardBaseCalAmount;
+                addedReward =
+                    (ledger[epochs[i]][msg.sender].amount *
+                        round.rewardAmount) /
+                    round.rewardBaseCalAmount;
             }
             // Round invalid, refund bet amount
             else {
-                require(refundable(epochs[i], msg.sender), "Not eligible for refund");
+                require(
+                    refundable(epochs[i], msg.sender),
+                    "Not eligible for refund"
+                );
                 addedReward = ledger[epochs[i]][msg.sender].amount;
             }
 
@@ -239,7 +273,7 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
         }
 
         if (reward > 0) {
-            token.safeTransfer(msg.sender, reward);
+            predictionToken.safeTransfer(msg.sender, reward);
         }
     }
 
@@ -249,7 +283,7 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      */
     function executeRound() external whenNotPaused onlyOperator {
         require(
-            genesisStartOnce && genesisLockOnce,
+            genesisStartOnce > 0 && genesisLockOnce > 0,
             "Can only run after genesisStartRound and genesisLockRound is triggered"
         );
 
@@ -271,9 +305,13 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      * @notice Lock genesis round
      * @dev Callable by operator
      */
+
     function genesisLockRound() external whenNotPaused onlyOperator {
-        require(genesisStartOnce, "Can only run after genesisStartRound is triggered");
-        require(!genesisLockOnce, "Can only run genesisLockRound once");
+        require(
+            genesisStartOnce > 0,
+            "Can only run after genesisStartRound is triggered"
+        );
+        require(genesisLockOnce == 0, "Can only run genesisLockRound once");
 
         (uint80 currentRoundId, int256 currentPrice) = _getPriceFromOracle();
 
@@ -283,7 +321,7 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
 
         currentEpoch = currentEpoch + 1;
         _startRound(currentEpoch);
-        genesisLockOnce = true;
+        genesisLockOnce = block.timestamp;
     }
 
     /**
@@ -291,57 +329,57 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      * @dev Callable by admin or operator
      */
     function genesisStartRound() external whenNotPaused onlyOperator {
-        require(!genesisStartOnce, "Can only run genesisStartRound once");
+        require(genesisStartOnce == 0, "Can only run genesisStartRound once");
 
         currentEpoch = currentEpoch + 1;
         _startRound(currentEpoch);
-        genesisStartOnce = true;
-    }
-
-    /**
-     * @notice called by the admin to pause, triggers stopped state
-     * @dev Callable by admin or operator
-     */
-    function pause() external whenNotPaused onlyAdminOrOperator {
-        _pause();
-
-        emit Pause(currentEpoch);
+        genesisStartOnce = block.timestamp;
     }
 
     /**
      * @notice Claim all rewards in treasury
      * @dev Callable by admin
      */
-    function claimTreasury() external nonReentrant onlyAdmin {
+    function claimTreasury() external nonReentrant onlyOwner {
         uint256 currentTreasuryAmount = treasuryAmount;
         treasuryAmount = 0;
-        token.safeTransfer(adminAddress, currentTreasuryAmount);
+        predictionToken.safeTransfer(owner(), currentTreasuryAmount);
         emit TreasuryClaim(currentTreasuryAmount);
     }
 
     /**
-     * @notice called by the admin to unpause, returns to normal state
-     * Reset genesis state. Once paused, the rounds would need to be kickstarted by genesis
-     * @dev Callable by admin or operator
+     * @notice Get the claimable stats of specific epoch and user account
+     * @param epoch: epoch
+     * @param user: user address
      */
-    function unpause() external whenPaused onlyAdminOrOperator {
-        genesisStartOnce = false;
-        genesisLockOnce = false;
-        _unpause();
-
-        emit Unpause(currentEpoch);
+    function claimable(uint256 epoch, address user) public view returns (bool) {
+        BetInfo memory betInfo = ledger[epoch][user];
+        Round memory round = rounds[epoch];
+        if (round.lockPrice == round.closePrice) {
+            return false;
+        }
+        return
+            round.oracleCalled &&
+            betInfo.amount != 0 &&
+            !betInfo.claimed &&
+            ((round.closePrice > round.lockPrice &&
+                betInfo.position == Position.Bull) ||
+                (round.closePrice < round.lockPrice &&
+                    betInfo.position == Position.Bear));
     }
 
     /**
      * @notice Set buffer and interval (in seconds)
      * @dev Callable by admin
      */
-    function setBufferAndIntervalSeconds(uint256 _bufferSeconds, uint256 _intervalSeconds)
-        external
-        whenPaused
-        onlyAdmin
-    {
-        require(_bufferSeconds < _intervalSeconds, "bufferSeconds must be inferior to intervalSeconds");
+    function setBufferAndIntervalSeconds(
+        uint256 _bufferSeconds,
+        uint256 _intervalSeconds
+    ) external whenPaused onlyOwner {
+        require(
+            _bufferSeconds < _intervalSeconds,
+            "bufferSeconds must be inferior to intervalSeconds"
+        );
         bufferSeconds = _bufferSeconds;
         intervalSeconds = _intervalSeconds;
 
@@ -352,7 +390,9 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      * @notice Set minBetAmount
      * @dev Callable by admin
      */
-    function setMinBetAmount(uint256 _minBetAmount) external whenPaused onlyAdmin {
+    function setMinBetAmount(
+        uint256 _minBetAmount
+    ) external whenPaused onlyOwner {
         require(_minBetAmount != 0, "Must be superior to 0");
         minBetAmount = _minBetAmount;
 
@@ -363,7 +403,7 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      * @notice Set operator address
      * @dev Callable by admin
      */
-    function setOperator(address _operatorAddress) external onlyAdmin {
+    function setOperator(address _operatorAddress) external onlyOwner {
         require(_operatorAddress != address(0), "Cannot be zero address");
         operatorAddress = _operatorAddress;
 
@@ -374,7 +414,7 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      * @notice Set Oracle address
      * @dev Callable by admin
      */
-    function setOracle(address _oracle) external whenPaused onlyAdmin {
+    function setOracle(address _oracle) external whenPaused onlyOwner {
         require(_oracle != address(0), "Cannot be zero address");
         oracleLatestRoundId = 0;
         oracle = AggregatorV3Interface(_oracle);
@@ -389,7 +429,9 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      * @notice Set oracle update allowance
      * @dev Callable by admin
      */
-    function setOracleUpdateAllowance(uint256 _oracleUpdateAllowance) external whenPaused onlyAdmin {
+    function setOracleUpdateAllowance(
+        uint256 _oracleUpdateAllowance
+    ) external whenPaused onlyOwner {
         oracleUpdateAllowance = _oracleUpdateAllowance;
 
         emit NewOracleUpdateAllowance(_oracleUpdateAllowance);
@@ -399,7 +441,9 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      * @notice Set treasury fee
      * @dev Callable by admin
      */
-    function setTreasuryFee(uint256 _treasuryFee) external whenPaused onlyAdmin {
+    function setTreasuryFee(
+        uint256 _treasuryFee
+    ) external whenPaused onlyOwner {
         require(_treasuryFee <= MAX_TREASURY_FEE, "Treasury fee too high");
         treasuryFee = _treasuryFee;
 
@@ -413,21 +457,10 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      * @dev Callable by owner
      */
     function recoverToken(address _token, uint256 _amount) external onlyOwner {
-        require(_token != address(token), "Cannot be prediction token address");
+        require(_token != address(predictionToken), "Cannot be prediction token address");
         IERC20(_token).safeTransfer(address(msg.sender), _amount);
 
         emit TokenRecovery(_token, _amount);
-    }
-
-    /**
-     * @notice Set admin address
-     * @dev Callable by owner
-     */
-    function setAdmin(address _adminAddress) external onlyOwner {
-        require(_adminAddress != address(0), "Cannot be zero address");
-        adminAddress = _adminAddress;
-
-        emit NewAdminAddress(_adminAddress);
     }
 
     /**
@@ -440,15 +473,7 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
         address user,
         uint256 cursor,
         uint256 size
-    )
-        external
-        view
-        returns (
-            uint256[] memory,
-            BetInfo[] memory,
-            uint256
-        )
-    {
+    ) external view returns (uint256[] memory, BetInfo[] memory, uint256) {
         uint256 length = size;
 
         if (length > userRounds[user].length - cursor) {
@@ -475,30 +500,14 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
     }
 
     /**
-     * @notice Get the claimable stats of specific epoch and user account
-     * @param epoch: epoch
-     * @param user: user address
-     */
-    function claimable(uint256 epoch, address user) public view returns (bool) {
-        BetInfo memory betInfo = ledger[epoch][user];
-        Round memory round = rounds[epoch];
-        if (round.lockPrice == round.closePrice) {
-            return false;
-        }
-        return
-            round.oracleCalled &&
-            betInfo.amount != 0 &&
-            !betInfo.claimed &&
-            ((round.closePrice > round.lockPrice && betInfo.position == Position.Bull) ||
-                (round.closePrice < round.lockPrice && betInfo.position == Position.Bear));
-    }
-
-    /**
      * @notice Get the refundable stats of specific epoch and user account
      * @param epoch: epoch
      * @param user: user address
      */
-    function refundable(uint256 epoch, address user) public view returns (bool) {
+    function refundable(
+        uint256 epoch,
+        address user
+    ) public view returns (bool) {
         BetInfo memory betInfo = ledger[epoch][user];
         Round memory round = rounds[epoch];
         return
@@ -513,7 +522,11 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      * @param epoch: epoch
      */
     function _calculateRewards(uint256 epoch) internal {
-        require(rounds[epoch].rewardBaseCalAmount == 0 && rounds[epoch].rewardAmount == 0, "Rewards calculated");
+        require(
+            rounds[epoch].rewardBaseCalAmount == 0 &&
+                rounds[epoch].rewardAmount == 0,
+            "Rewards calculated"
+        );
         Round storage round = rounds[epoch];
         uint256 rewardBaseCalAmount;
         uint256 treasuryAmt;
@@ -543,7 +556,12 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
         // Add to treasury
         treasuryAmount += treasuryAmt;
 
-        emit RewardsCalculated(epoch, rewardBaseCalAmount, rewardAmount, treasuryAmt);
+        emit RewardsCalculated(
+            epoch,
+            rewardBaseCalAmount,
+            rewardAmount,
+            treasuryAmt
+        );
     }
 
     /**
@@ -557,8 +575,14 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
         uint256 roundId,
         int256 price
     ) internal {
-        require(rounds[epoch].lockTimestamp != 0, "Can only end round after round has locked");
-        require(block.timestamp >= rounds[epoch].closeTimestamp, "Can only end round after closeTimestamp");
+        require(
+            rounds[epoch].lockTimestamp != 0,
+            "Can only end round after round has locked"
+        );
+        require(
+            block.timestamp >= rounds[epoch].closeTimestamp,
+            "Can only end round after closeTimestamp"
+        );
         require(
             block.timestamp <= rounds[epoch].closeTimestamp + bufferSeconds,
             "Can only end round within bufferSeconds"
@@ -582,8 +606,14 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
         uint256 roundId,
         int256 price
     ) internal {
-        require(rounds[epoch].startTimestamp != 0, "Can only lock round after round has started");
-        require(block.timestamp >= rounds[epoch].lockTimestamp, "Can only lock round after lockTimestamp");
+        require(
+            rounds[epoch].startTimestamp != 0,
+            "Can only lock round after round has started"
+        );
+        require(
+            block.timestamp >= rounds[epoch].lockTimestamp,
+            "Can only lock round after lockTimestamp"
+        );
         require(
             block.timestamp <= rounds[epoch].lockTimestamp + bufferSeconds,
             "Can only lock round within bufferSeconds"
@@ -602,8 +632,14 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      * @param epoch: epoch
      */
     function _safeStartRound(uint256 epoch) internal {
-        require(genesisStartOnce, "Can only run after genesisStartRound is triggered");
-        require(rounds[epoch - 2].closeTimestamp != 0, "Can only start round after round n-2 has ended");
+        require(
+            genesisStartOnce == 0,
+            "Can only run after genesisStartRound is triggered"
+        );
+        require(
+            rounds[epoch - 2].closeTimestamp != 0,
+            "Can only start round after round n-2 has ended"
+        );
         require(
             block.timestamp >= rounds[epoch - 2].closeTimestamp,
             "Can only start new round after round n-2 closeTimestamp"
@@ -632,6 +668,7 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      * Round must have started and locked
      * Current timestamp must be within startTimestamp and closeTimestamp
      */
+
     function _bettable(uint256 epoch) internal view returns (bool) {
         return
             rounds[epoch].startTimestamp != 0 &&
@@ -646,8 +683,12 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      */
     function _getPriceFromOracle() internal view returns (uint80, int256) {
         uint256 leastAllowedTimestamp = block.timestamp + oracleUpdateAllowance;
-        (uint80 roundId, int256 price, , uint256 timestamp, ) = oracle.latestRoundData();
-        require(timestamp <= leastAllowedTimestamp, "Oracle update exceeded max timestamp allowance");
+        (uint80 roundId, int256 price, , uint256 timestamp, ) = oracle
+            .latestRoundData();
+        require(
+            timestamp <= leastAllowedTimestamp,
+            "Oracle update exceeded max timestamp allowance"
+        );
         require(
             uint256(roundId) > oracleLatestRoundId,
             "Oracle update roundId must be larger than oracleLatestRoundId"
