@@ -150,45 +150,156 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
 
         predictionToken = IERC20(_token);
         oracle = AggregatorV3Interface(_oracleAddress);
-        // adminAddress = _adminAddress;
-        // operatorAddress = _operatorAddress;
-        // intervalSeconds = _intervalSeconds;
-        // bufferSeconds = _bufferSeconds;
-        // minBetAmount = _minBetAmount;
-        // oracleUpdateAllowance = _oracleUpdateAllowance;
-        // treasuryFee = _treasuryFee;
+        operatorAddress = _operatorAddress;
+        intervalSeconds = _intervalSeconds;
+        bufferSeconds = _bufferSeconds;
+        minBetAmount = _minBetAmount;
+        oracleUpdateAllowance = _oracleUpdateAllowance;
+        treasuryFee = _treasuryFee;
     }
 
-    // function betBear(
-    //     uint256 epoch,
-    //     uint256 _amount
-    // ) external whenNotPaused nonReentrant notContract {
-    //     require(epoch == currentEpoch, "Bet is too early/late");
-    //     require(_bettable(epoch), "Round not bettable");
-    //     require(
-    //         _amount >= minBetAmount,
-    //         "Bet amount must be greater than minBetAmount"
-    //     );
-    //     require(
-    //         ledger[epoch][msg.sender].amount == 0,
-    //         "Can only bet once per round"
-    //     );
+    function betBear(
+        uint256 epoch,
+        uint256 _amount
+    ) external whenNotPaused nonReentrant notContract {
+        require(epoch == currentEpoch, "Bet is too early/late");
+        require(_bettable(epoch), "Round not bettable");
+        require(
+            _amount >= minBetAmount,
+            "Bet amount must be greater than minBetAmount"
+        );
+        require(
+            ledger[epoch][msg.sender].amount == 0,
+            "Can only bet once per round"
+        );
 
-    //     token.safeTransferFrom(msg.sender, address(this), _amount);
-    //     // Update round data
-    //     uint256 amount = _amount;
-    //     Round storage round = rounds[epoch];
-    //     round.totalAmount = round.totalAmount + amount;
-    //     round.bearAmount = round.bearAmount + amount;
+        predictionToken.safeTransferFrom(msg.sender, address(this), _amount);
+        // Update round data
+        uint256 amount = _amount;
+        Round storage round = rounds[epoch];
+        round.totalAmount = round.totalAmount + amount;
+        round.bearAmount = round.bearAmount + amount;
 
-    //     // Update user data
-    //     BetInfo storage betInfo = ledger[epoch][msg.sender];
-    //     betInfo.position = Position.Bear;
-    //     betInfo.amount = amount;
-    //     userRounds[msg.sender].push(epoch);
+        // Update user data
+        BetInfo storage betInfo = ledger[epoch][msg.sender];
+        betInfo.position = Position.Bear;
+        betInfo.amount = amount;
+        userRounds[msg.sender].push(epoch);
 
-    //     emit BetBear(msg.sender, epoch, amount);
-    // }
+        emit BetBear(msg.sender, epoch, amount);
+    }
+
+    /**
+     * @notice Bet bull position
+     * @param epoch: epoch
+     */
+    function betBull(
+        uint256 epoch,
+        uint256 _amount
+    ) external whenNotPaused nonReentrant notContract {
+        require(epoch == currentEpoch, "Bet is too early/late");
+        require(_bettable(epoch), "Round not bettable");
+        require(
+            _amount >= minBetAmount,
+            "Bet amount must be greater than minBetAmount"
+        );
+        require(
+            ledger[epoch][msg.sender].amount == 0,
+            "Can only bet once per round"
+        );
+
+        predictionToken.safeTransferFrom(msg.sender, address(this), _amount);
+        // Update round data
+        uint256 amount = _amount;
+        Round storage round = rounds[epoch];
+        round.totalAmount = round.totalAmount + amount;
+        round.bullAmount = round.bullAmount + amount;
+
+        // Update user data
+        BetInfo storage betInfo = ledger[epoch][msg.sender];
+        betInfo.position = Position.Bull;
+        betInfo.amount = amount;
+        userRounds[msg.sender].push(epoch);
+
+        emit BetBull(msg.sender, epoch, amount);
+    }
+
+    /**
+     * @notice Claim reward for an array of epochs
+     * @param epochs: array of epochs
+     */
+    function claim(
+        uint256[] calldata epochs
+    ) external nonReentrant notContract {
+        uint256 reward; // Initializes reward
+
+        for (uint256 i = 0; i < epochs.length; i++) {
+            require(
+                rounds[epochs[i]].startTimestamp != 0,
+                "Round has not started"
+            );
+            require(
+                block.timestamp > rounds[epochs[i]].closeTimestamp,
+                "Round has not ended"
+            );
+
+            uint256 addedReward = 0;
+
+            // Round valid, claim rewards
+            if (rounds[epochs[i]].oracleCalled) {
+                require(
+                    claimable(epochs[i], msg.sender),
+                    "Not eligible for claim"
+                );
+                Round memory round = rounds[epochs[i]];
+                addedReward =
+                    (ledger[epochs[i]][msg.sender].amount *
+                        round.rewardAmount) /
+                    round.rewardBaseCalAmount;
+            }
+            // Round invalid, refund bet amount
+            else {
+                require(
+                    refundable(epochs[i], msg.sender),
+                    "Not eligible for refund"
+                );
+                addedReward = ledger[epochs[i]][msg.sender].amount;
+            }
+
+            ledger[epochs[i]][msg.sender].claimed = true;
+            reward += addedReward;
+
+            emit Claim(msg.sender, epochs[i], addedReward);
+        }
+
+        if (reward > 0) {
+            predictionToken.safeTransfer(msg.sender, reward);
+        }
+    }
+
+    /**
+     * @notice Start the next round n, lock price for round n-1, end round n-2
+     * @dev Callable by operator
+     */
+    function executeRound() external whenNotPaused onlyOperator {
+        require(
+            genesisStartOnce > 0 && genesisLockOnce > 0,
+            "Can only run after genesisStartRound and genesisLockRound is triggered"
+        );
+
+        (uint80 currentRoundId, int256 currentPrice) = _getPriceFromOracle();
+
+        oracleLatestRoundId = uint256(currentRoundId);
+
+        // CurrentEpoch refers to previous round (n-1)
+        _safeLockRound(currentEpoch, currentRoundId, currentPrice);
+        _safeEndRound(currentEpoch - 1, currentRoundId, currentPrice);
+        _calculateRewards(currentEpoch - 1);
+
+        // Increment currentEpoch to current round (n)
+        currentEpoch = currentEpoch + 1;
+        _safeStartRound(currentEpoch);
+    }
 
     /**
      * @notice Lock genesis round
@@ -223,6 +334,234 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
         currentEpoch = currentEpoch + 1;
         _startRound(currentEpoch);
         genesisStartOnce = block.timestamp;
+    }
+
+    /**
+     * @notice Claim all rewards in treasury
+     * @dev Callable by admin
+     */
+    function claimTreasury() external nonReentrant onlyOwner {
+        uint256 currentTreasuryAmount = treasuryAmount;
+        treasuryAmount = 0;
+        predictionToken.safeTransfer(owner(), currentTreasuryAmount);
+        emit TreasuryClaim(currentTreasuryAmount);
+    }
+
+    /**
+     * @notice Get the claimable stats of specific epoch and user account
+     * @param epoch: epoch
+     * @param user: user address
+     */
+    function claimable(uint256 epoch, address user) public view returns (bool) {
+        BetInfo memory betInfo = ledger[epoch][user];
+        Round memory round = rounds[epoch];
+        if (round.lockPrice == round.closePrice) {
+            return false;
+        }
+        return
+            round.oracleCalled &&
+            betInfo.amount != 0 &&
+            !betInfo.claimed &&
+            ((round.closePrice > round.lockPrice &&
+                betInfo.position == Position.Bull) ||
+                (round.closePrice < round.lockPrice &&
+                    betInfo.position == Position.Bear));
+    }
+
+    /**
+     * @notice Set buffer and interval (in seconds)
+     * @dev Callable by admin
+     */
+    function setBufferAndIntervalSeconds(
+        uint256 _bufferSeconds,
+        uint256 _intervalSeconds
+    ) external whenPaused onlyOwner {
+        require(
+            _bufferSeconds < _intervalSeconds,
+            "bufferSeconds must be inferior to intervalSeconds"
+        );
+        bufferSeconds = _bufferSeconds;
+        intervalSeconds = _intervalSeconds;
+
+        emit NewBufferAndIntervalSeconds(_bufferSeconds, _intervalSeconds);
+    }
+
+    /**
+     * @notice Set minBetAmount
+     * @dev Callable by admin
+     */
+    function setMinBetAmount(
+        uint256 _minBetAmount
+    ) external whenPaused onlyOwner {
+        require(_minBetAmount != 0, "Must be superior to 0");
+        minBetAmount = _minBetAmount;
+
+        emit NewMinBetAmount(currentEpoch, minBetAmount);
+    }
+
+    /**
+     * @notice Set operator address
+     * @dev Callable by admin
+     */
+    function setOperator(address _operatorAddress) external onlyOwner {
+        require(_operatorAddress != address(0), "Cannot be zero address");
+        operatorAddress = _operatorAddress;
+
+        emit NewOperatorAddress(_operatorAddress);
+    }
+
+    /**
+     * @notice Set Oracle address
+     * @dev Callable by admin
+     */
+    function setOracle(address _oracle) external whenPaused onlyOwner {
+        require(_oracle != address(0), "Cannot be zero address");
+        oracleLatestRoundId = 0;
+        oracle = AggregatorV3Interface(_oracle);
+
+        // Dummy check to make sure the interface implements this function properly
+        oracle.latestRoundData();
+
+        emit NewOracle(_oracle);
+    }
+
+    /**
+     * @notice Set oracle update allowance
+     * @dev Callable by admin
+     */
+    function setOracleUpdateAllowance(
+        uint256 _oracleUpdateAllowance
+    ) external whenPaused onlyOwner {
+        oracleUpdateAllowance = _oracleUpdateAllowance;
+
+        emit NewOracleUpdateAllowance(_oracleUpdateAllowance);
+    }
+
+    /**
+     * @notice Set treasury fee
+     * @dev Callable by admin
+     */
+    function setTreasuryFee(
+        uint256 _treasuryFee
+    ) external whenPaused onlyOwner {
+        require(_treasuryFee <= MAX_TREASURY_FEE, "Treasury fee too high");
+        treasuryFee = _treasuryFee;
+
+        emit NewTreasuryFee(currentEpoch, treasuryFee);
+    }
+
+    /**
+     * @notice It allows the owner to recover tokens sent to the contract by mistake
+     * @param _token: token address
+     * @param _amount: token amount
+     * @dev Callable by owner
+     */
+    function recoverToken(address _token, uint256 _amount) external onlyOwner {
+        require(_token != address(predictionToken), "Cannot be prediction token address");
+        IERC20(_token).safeTransfer(address(msg.sender), _amount);
+
+        emit TokenRecovery(_token, _amount);
+    }
+
+    /**
+     * @notice Returns round epochs and bet information for a user that has participated
+     * @param user: user address
+     * @param cursor: cursor
+     * @param size: size
+     */
+    function getUserRounds(
+        address user,
+        uint256 cursor,
+        uint256 size
+    ) external view returns (uint256[] memory, BetInfo[] memory, uint256) {
+        uint256 length = size;
+
+        if (length > userRounds[user].length - cursor) {
+            length = userRounds[user].length - cursor;
+        }
+
+        uint256[] memory values = new uint256[](length);
+        BetInfo[] memory betInfo = new BetInfo[](length);
+
+        for (uint256 i = 0; i < length; i++) {
+            values[i] = userRounds[user][cursor + i];
+            betInfo[i] = ledger[values[i]][user];
+        }
+
+        return (values, betInfo, cursor + length);
+    }
+
+    /**
+     * @notice Returns round epochs length
+     * @param user: user address
+     */
+    function getUserRoundsLength(address user) external view returns (uint256) {
+        return userRounds[user].length;
+    }
+
+    /**
+     * @notice Get the refundable stats of specific epoch and user account
+     * @param epoch: epoch
+     * @param user: user address
+     */
+    function refundable(
+        uint256 epoch,
+        address user
+    ) public view returns (bool) {
+        BetInfo memory betInfo = ledger[epoch][user];
+        Round memory round = rounds[epoch];
+        return
+            !round.oracleCalled &&
+            !betInfo.claimed &&
+            block.timestamp > round.closeTimestamp + bufferSeconds &&
+            betInfo.amount != 0;
+    }
+
+    /**
+     * @notice Calculate rewards for round
+     * @param epoch: epoch
+     */
+    function _calculateRewards(uint256 epoch) internal {
+        require(
+            rounds[epoch].rewardBaseCalAmount == 0 &&
+                rounds[epoch].rewardAmount == 0,
+            "Rewards calculated"
+        );
+        Round storage round = rounds[epoch];
+        uint256 rewardBaseCalAmount;
+        uint256 treasuryAmt;
+        uint256 rewardAmount;
+
+        // Bull wins
+        if (round.closePrice > round.lockPrice) {
+            rewardBaseCalAmount = round.bullAmount;
+            treasuryAmt = (round.totalAmount * treasuryFee) / 10000;
+            rewardAmount = round.totalAmount - treasuryAmt;
+        }
+        // Bear wins
+        else if (round.closePrice < round.lockPrice) {
+            rewardBaseCalAmount = round.bearAmount;
+            treasuryAmt = (round.totalAmount * treasuryFee) / 10000;
+            rewardAmount = round.totalAmount - treasuryAmt;
+        }
+        // House wins
+        else {
+            rewardBaseCalAmount = 0;
+            rewardAmount = 0;
+            treasuryAmt = round.totalAmount;
+        }
+        round.rewardBaseCalAmount = rewardBaseCalAmount;
+        round.rewardAmount = rewardAmount;
+
+        // Add to treasury
+        treasuryAmount += treasuryAmt;
+
+        emit RewardsCalculated(
+            epoch,
+            rewardBaseCalAmount,
+            rewardAmount,
+            treasuryAmt
+        );
     }
 
     /**
