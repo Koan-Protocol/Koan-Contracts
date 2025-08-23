@@ -10,7 +10,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
 /**
- * @title PancakePredictionV3
+ * @title KOANPROTOCOL PREDICTION
  */
 contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -132,7 +132,7 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      * @param _treasuryFee: treasury fee (1000 = 10%)
      */
     constructor(
-        IERC20 _token,
+        address _token,
         address _oracleAddress,
         address _adminAddress,
         address _operatorAddress,
@@ -144,7 +144,7 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
     ) {
         require(_treasuryFee <= MAX_TREASURY_FEE, "Treasury fee too high");
 
-        token = _token;
+        token = IERC20(_token);
         oracle = AggregatorV3Interface(_oracleAddress);
         adminAddress = _adminAddress;
         operatorAddress = _operatorAddress;
