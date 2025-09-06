@@ -21,7 +21,7 @@ library ERC1155Utils {
      * The acceptance call is not executed and treated as a no-op if the target address doesn't contain code (i.e. an EOA).
      * Otherwise, the recipient must implement {IERC1155Receiver-onERC1155Received} and return the acceptance magic value to accept
      * the transfer.
-     */
+    E342axx?   */
     function checkOnERC1155Received(
         address operator,
         address from,
