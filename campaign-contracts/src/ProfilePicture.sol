@@ -3,102 +3,177 @@ pragma solidity ^0.8.13;
 
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {ERC721URIStorage} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import {ERC721Burnable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
+import {ERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import {ERC721Pausable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
-import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract KoanProfile is ERC721, ERC721URIStorage, Ownable {
-    using Counters for Counters.Counter;
-    Counters.Counter private _tokenIds;
+contract KoanProfile is
+    ERC721,
+    ERC721Enumerable,
+    ERC721URIStorage,
+    ERC721Pausable,
+    Ownable,
+    ERC721Burnable
+{
+    AggregatorV3Interface internal dataFeed;
+    uint256 MINT_PRICE_USD = 50_000_000; //$0.5= 50_000_000/10e8
 
+    uint256 private _nextTokenId;
     mapping(address => uint256) public userCurrentPFP;
-    string private baseTokenURI;
-    address public feeCollector;
-
-    AggregatorV3Interface internal priceFeed;
-
-    uint256 public constant MINT_FEE_USD = 0.5 * 10 ** 8;
 
     event PFUpdated(address indexed user, uint256 tokenId);
 
     constructor(
-        address _priceFeed,
-        string memory _baseTokenURI,
-        address _feeCollector
-    ) ERC721("KoanProfile", "KPF") Ownable(msg.sender) {
-        priceFeed = AggregatorV3Interface(_priceFeed);
-        baseTokenURI = _baseTokenURI;
-        feeCollector = _feeCollector;
+        address initialOwner
+    ) ERC721("KoanprotocolProfileAvatars", "KPPA") Ownable(initialOwner) {
+        dataFeed = AggregatorV3Interface(
+            0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1
+        );
     }
 
-    function mintPFP() public payable returns (uint256) {
-        require(balanceOf(msg.sender) == 0, "User already owns a token");
-        
-        uint256 mintFee = _calculateMintAmount();
-        require(msg.value >= mintFee, "Insufficient ETH for $0.50 fee");
+    function pause() public onlyOwner {
+        _pause();
+    }
 
-        if (userCurrentPFP[msg.sender] != 0) {
-            uint256 oldTokenId = userCurrentPFP[msg.sender];
-            _burn(oldTokenId);
+    function unpause() public onlyOwner {
+        _unpause();
+    }
+
+    function safeMint(
+        address to,
+        string memory uri
+    ) public onlyOwner returns (uint256) {
+        uint256 tokenId = _nextTokenId++;
+        _safeMint(to, tokenId);
+        _setTokenURI(tokenId, uri);
+        return tokenId;
+    }
+
+    function mint(string memory uri) public payable returns (uint256) {
+        uint256 requiredETH = getMintPriceETHAmount();
+        require(msg.value >= requiredETH, "Insufficient ETH sent");
+
+        (bool success, ) = payable(owner()).call{value: requiredETH}("");
+        require(success, "Payment failed");
+
+        uint256 tokenId = _nextTokenId++;
+        _safeMint(msg.sender, tokenId);
+        _setTokenURI(tokenId, uri);
+        userCurrentPFP[msg.sender] = tokenId;
+
+        // Refund excess ETH if any
+        if (msg.value > requiredETH) {
+            payable(msg.sender).transfer(msg.value - requiredETH);
         }
 
-        _tokenIds.increment();
-        uint256 newTokenId = _tokenIds.current();
-        _safeMint(msg.sender, newTokenId);
-        
-        userCurrentPFP[msg.sender] = newTokenId;
-        emit PFUpdated(msg.sender, newTokenId);
+        return tokenId;
+    }
 
-        payable(feeCollector).transfer(mintFee);
-        
-        if (msg.value > mintFee) {
-            payable(msg.sender).transfer(msg.value - mintFee);
-        }
+    function withdrawERC20(
+        address tokenAddress,
+        uint256 amount
+    ) public onlyOwner {
+        IERC20 token = IERC20(tokenAddress);
+        uint256 balance = token.balanceOf(address(this));
 
-        return newTokenId;
+        require(balance > 0, "No tokens to withdraw");
+        require(amount <= balance, "Insufficient token balance");
+
+        bool success = token.transfer(owner(), amount);
+        require(success, "Token transfer failed");
+    }
+
+    // Function to withdraw ALL ERC20 tokens of a specific type
+    function withdrawAllERC20(address tokenAddress) public onlyOwner {
+        IERC20 token = IERC20(tokenAddress);
+        uint256 balance = token.balanceOf(address(this));
+
+        require(balance > 0, "No tokens to withdraw");
+
+        bool success = token.transfer(owner(), balance);
+        require(success, "Token transfer failed");
+    }
+
+    // The following functions are overrides required by Solidity.
+
+    function _update(
+        address to,
+        uint256 tokenId,
+        address auth
+    )
+        internal
+        override(ERC721, ERC721Enumerable, ERC721Pausable)
+        returns (address)
+    {
+        return super._update(to, tokenId, auth);
+    }
+
+    function _increaseBalance(
+        address account,
+        uint128 value
+    ) internal override(ERC721, ERC721Enumerable) {
+        super._increaseBalance(account, value);
+    }
+
+    function _setProfilePicture(uint256 tokenId) private returns (bool) {
+        require(_ownerOf(tokenId) == msg.sender, "you are not owner");
+        userCurrentPFP[msg.sender] = tokenId;
+        emit PFUpdated(msg.sender, tokenId);
+        return true;
+    }
+
+    function setProfilePicture(uint256 tokenId) external {
+        _setProfilePicture(tokenId);
     }
 
     function getUserPFP(address user) public view returns (uint256) {
         return userCurrentPFP[user];
     }
-    
-    function calculateMintAmount() public view returns (uint256) {
-        return _calculateMintAmount();
-    }
-
-    function _calculateMintAmount() private view returns (uint256) {
-        (, int256 ethUsdPrice, , , ) = priceFeed.latestRoundData();
-        require(ethUsdPrice > 0, "Invalid price feed");
-        return (MINT_FEE_USD * 10 ** 18) / uint256(ethUsdPrice);
-    }
 
     function tokenURI(
         uint256 tokenId
     ) public view override(ERC721, ERC721URIStorage) returns (string memory) {
-        require(_exists(tokenId), "Token does not exist");
-        return string(abi.encodePacked(baseTokenURI, _toString(tokenId)));
-    }
-
-    function _toString(uint256 value) internal pure returns (string memory) {
-        if (value == 0) return "0";
-        uint256 temp = value;
-        uint256 digits;
-        while (temp != 0) {
-            digits++;
-            temp /= 10;
-        }
-        bytes memory buffer = new bytes(digits);
-        while (value != 0) {
-            digits -= 1;
-            buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
-            value /= 10;
-        }
-        return string(buffer);
+        return super.tokenURI(tokenId);
     }
 
     function supportsInterface(
         bytes4 interfaceId
-    ) public view override(ERC721, ERC721URIStorage) returns (bool) {
+    )
+        public
+        view
+        override(ERC721, ERC721Enumerable, ERC721URIStorage)
+        returns (bool)
+    {
         return super.supportsInterface(interfaceId);
+    }
+
+    function getChainlinkDataFeedLatestAnswer() public view returns (int) {
+        // prettier-ignore
+        (
+            /* uint80 roundId */,
+            int256 answer,
+            /*uint256 startedAt*/,
+            /*uint256 updatedAt*/,
+            /*uint80 answeredInRound*/
+        ) = dataFeed.latestRoundData();
+        return answer;
+    }
+
+    function getMintPriceETHAmount() public view returns (uint256) {
+        (
+            ,
+            /* uint80 roundId */ int256 price /*uint256 startedAt*/ /*uint256 updatedAt*/ /*uint80 answeredInRound*/,
+            ,
+            ,
+
+        ) = dataFeed.latestRoundData();
+        require(price > 0, "Invalid price from oracle");
+
+        uint256 ethAmount = (MINT_PRICE_USD * 1 ether) / uint256(price);
+
+        return ethAmount;
     }
 }
