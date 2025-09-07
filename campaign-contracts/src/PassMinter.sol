@@ -19,6 +19,8 @@ contract KoanProtocolPass1155 is
     ERC1155Supply
 {
     AggregatorV3Interface internal dataFeed;
+    uint256 MINT_PRICE_USD = 50_000_000; //$0.5= 50_000_000/10e8
+    
 
     constructor(address initialOwner) ERC1155("") Ownable(initialOwner) {
         dataFeed = AggregatorV3Interface(

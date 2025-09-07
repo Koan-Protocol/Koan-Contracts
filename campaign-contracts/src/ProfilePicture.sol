@@ -28,7 +28,7 @@ contract KoanProfile is
 
     constructor(
         address initialOwner
-    ) ERC721("MyToken", "MTK") Ownable(initialOwner) {
+    ) ERC721("KoanprotocolProfileAvatars", "KPPA") Ownable(initialOwner) {
         dataFeed = AggregatorV3Interface(
             0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1
         );
@@ -62,7 +62,7 @@ contract KoanProfile is
         uint256 tokenId = _nextTokenId++;
         _safeMint(msg.sender, tokenId);
         _setTokenURI(tokenId, uri);
-        userCurrentPFP[msg.sender] = newTokenId;
+        userCurrentPFP[msg.sender] = tokenId;
 
         // Refund excess ETH if any
         if (msg.value > requiredETH) {
