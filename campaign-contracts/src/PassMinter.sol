@@ -8,8 +8,9 @@ import {ERC1155Burnable} from "@openzeppelin/contracts/token/ERC1155/extensions/
 import {ERC1155Pausable} from "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Pausable.sol";
 import {ERC1155Supply} from "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {PriceFeed} from "./utils/PriceFeed.sol";
 
-import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+// import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 contract KoanProtocolPass1155 is
     ERC1155,
@@ -18,7 +19,8 @@ contract KoanProtocolPass1155 is
     ERC1155Burnable,
     ERC1155Supply
 {
-    AggregatorV3Interface internal dataFeed;
+    // AggregatorV3Interface internal dataFeed;
+    address public dataFeed;
     uint256 MINT_PRICE_USD = 50_000_000; //$0.5= 50_000_000/10e8
 
     mapping(uint256 => bool) public validIds;
@@ -37,9 +39,10 @@ contract KoanProtocolPass1155 is
     );
 
     constructor(address initialOwner) ERC1155("") Ownable(initialOwner) {
-        dataFeed = AggregatorV3Interface(
-            0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1
-        );
+        dataFeed = 0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1;
+        // dataFeed = AggregatorV3Interface(
+        //     0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1
+        // );
     }
 
     function setURI(string memory newuri) public onlyOwner {
@@ -71,7 +74,11 @@ contract KoanProtocolPass1155 is
         uint256 id,
         bytes memory data
     ) public payable {
-        uint256 requiredETH = getMintPriceETHAmount();
+        uint256 requiredETH = PriceFeed.getETHAmountFromUSD(
+            dataFeed,
+            MINT_PRICE_USD
+        );
+        // uint256 requiredETH = getMintPriceETHAmount();
         require(msg.value >= requiredETH, "Insufficient ETH sent");
 
         require(validIds[id], "Invalid or inactive event");
@@ -121,25 +128,12 @@ contract KoanProtocolPass1155 is
     }
 
     function getChainlinkDataFeedLatestAnswer() public view returns (int) {
-        // prettier-ignore
-        (
-            /* uint80 roundId */,
-            int256 answer,
-            /*uint256 startedAt*/,
-            /*uint256 updatedAt*/,
-            /*uint80 answeredInRound*/
-        ) = dataFeed.latestRoundData();
-        return answer;
+        
+        return PriceFeed.getLatestPrice(dataFeed);
     }
 
     function getMintPriceETHAmount() public view returns (uint256) {
-        (
-            ,
-            /* uint80 roundId */ int256 price /*uint256 startedAt*/ /*uint256 updatedAt*/ /*uint80 answeredInRound*/,
-            ,
-            ,
-
-        ) = dataFeed.latestRoundData();
+        int256 price = PriceFeed.getLatestPrice(dataFeed);
         require(price > 0, "Invalid price from oracle");
 
         uint256 ethAmount = (MINT_PRICE_USD * 1 ether) / uint256(price);
