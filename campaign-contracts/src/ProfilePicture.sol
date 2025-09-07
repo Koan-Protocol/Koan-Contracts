@@ -7,8 +7,9 @@ import {ERC721Burnable} from "@openzeppelin/contracts/token/ERC721/extensions/ER
 import {ERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import {ERC721Pausable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {PriceFeed} from "./utils/PriceFeed.sol";
 
 contract KoanProfile is
     ERC721,
@@ -18,8 +19,12 @@ contract KoanProfile is
     Ownable,
     ERC721Burnable
 {
-    AggregatorV3Interface internal dataFeed;
+    using Strings for uint256;
+    // AggregatorV3Interface internal dataFeed;
+    address public dataFeed;
     uint256 MINT_PRICE_USD = 50_000_000; //$0.5= 50_000_000/10e8
+
+    string private _baseTokenURI;
 
     uint256 private _nextTokenId;
     mapping(address => uint256) public userCurrentPFP;
@@ -29,9 +34,11 @@ contract KoanProfile is
     constructor(
         address initialOwner
     ) ERC721("KoanprotocolProfileAvatars", "KPPA") Ownable(initialOwner) {
-        dataFeed = AggregatorV3Interface(
-            0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1
-        );
+        dataFeed = 0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1;
+
+        // dataFeed = AggregatorV3Interface(
+        //     0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1
+        // );
     }
 
     function pause() public onlyOwner {
@@ -52,8 +59,12 @@ contract KoanProfile is
         return tokenId;
     }
 
-    function mint(string memory uri) public payable returns (uint256) {
-        uint256 requiredETH = getMintPriceETHAmount();
+    function mint() public payable returns (uint256) {
+        uint256 requiredETH = PriceFeed.getETHAmountFromUSD(
+            dataFeed,
+            MINT_PRICE_USD
+        );
+        // uint256 requiredETH = getMintPriceETHAmount();
         require(msg.value >= requiredETH, "Insufficient ETH sent");
 
         (bool success, ) = payable(owner()).call{value: requiredETH}("");
@@ -61,7 +72,6 @@ contract KoanProfile is
 
         uint256 tokenId = _nextTokenId++;
         _safeMint(msg.sender, tokenId);
-        _setTokenURI(tokenId, uri);
         userCurrentPFP[msg.sender] = tokenId;
 
         // Refund excess ETH if any
@@ -136,7 +146,21 @@ contract KoanProfile is
     function tokenURI(
         uint256 tokenId
     ) public view override(ERC721, ERC721URIStorage) returns (string memory) {
-        return super.tokenURI(tokenId);
+        _requireOwned(tokenId);
+
+        string memory base = _baseURI();
+        return
+            bytes(base).length > 0
+                ? string(abi.encodePacked(base, tokenId.toString(), ".json"))
+                : "";
+    }
+
+    function setBaseURI(string memory baseURI_) external onlyOwner {
+        _baseTokenURI = baseURI_;
+    }
+
+    function _baseURI() internal view override returns (string memory) {
+        return _baseTokenURI;
     }
 
     function supportsInterface(
@@ -151,25 +175,11 @@ contract KoanProfile is
     }
 
     function getChainlinkDataFeedLatestAnswer() public view returns (int) {
-        // prettier-ignore
-        (
-            /* uint80 roundId */,
-            int256 answer,
-            /*uint256 startedAt*/,
-            /*uint256 updatedAt*/,
-            /*uint80 answeredInRound*/
-        ) = dataFeed.latestRoundData();
-        return answer;
+        return PriceFeed.getLatestPrice(dataFeed);
     }
 
     function getMintPriceETHAmount() public view returns (uint256) {
-        (
-            ,
-            /* uint80 roundId */ int256 price /*uint256 startedAt*/ /*uint256 updatedAt*/ /*uint80 answeredInRound*/,
-            ,
-            ,
-
-        ) = dataFeed.latestRoundData();
+        int256 price = PriceFeed.getLatestPrice(dataFeed);
         require(price > 0, "Invalid price from oracle");
 
         uint256 ethAmount = (MINT_PRICE_USD * 1 ether) / uint256(price);
