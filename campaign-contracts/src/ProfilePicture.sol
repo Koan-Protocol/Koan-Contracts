@@ -59,7 +59,7 @@ contract KoanProfile is
         return tokenId;
     }
 
-    function mint() public payable returns (uint256) {
+    function mint(string memory uri) public payable returns (uint256) {
         uint256 requiredETH = PriceFeed.getETHAmountFromUSD(
             dataFeed,
             MINT_PRICE_USD
@@ -72,6 +72,7 @@ contract KoanProfile is
 
         uint256 tokenId = _nextTokenId++;
         _safeMint(msg.sender, tokenId);
+        _setTokenURI(tokenId, uri);
         userCurrentPFP[msg.sender] = tokenId;
 
         // Refund excess ETH if any
