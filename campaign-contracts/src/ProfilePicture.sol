@@ -24,8 +24,6 @@ contract KoanProfile is
     address public dataFeed;
     uint256 MINT_PRICE_USD = 50_000_000; //$0.5= 50_000_000/10e8
 
-    string private _baseTokenURI;
-
     uint256 private _nextTokenId;
     mapping(address => uint256) public userCurrentPFP;
 
@@ -56,6 +54,7 @@ contract KoanProfile is
         uint256 tokenId = _nextTokenId++;
         _safeMint(to, tokenId);
         _setTokenURI(tokenId, uri);
+
         return tokenId;
     }
 
@@ -64,7 +63,6 @@ contract KoanProfile is
             dataFeed,
             MINT_PRICE_USD
         );
-        // uint256 requiredETH = getMintPriceETHAmount();
         require(msg.value >= requiredETH, "Insufficient ETH sent");
 
         (bool success, ) = payable(owner()).call{value: requiredETH}("");
@@ -95,6 +93,12 @@ contract KoanProfile is
 
         bool success = token.transfer(owner(), amount);
         require(success, "Token transfer failed");
+    }
+
+    function tokenURI(
+        uint256 tokenId
+    ) public view override(ERC721, ERC721URIStorage) returns (string memory) {
+        return super.tokenURI(tokenId);
     }
 
     // Function to withdraw ALL ERC20 tokens of a specific type
@@ -142,26 +146,6 @@ contract KoanProfile is
 
     function getUserPFP(address user) public view returns (uint256) {
         return userCurrentPFP[user];
-    }
-
-    function tokenURI(
-        uint256 tokenId
-    ) public view override(ERC721, ERC721URIStorage) returns (string memory) {
-        _requireOwned(tokenId);
-
-        string memory base = _baseURI();
-        return
-            bytes(base).length > 0
-                ? string(abi.encodePacked(base, tokenId.toString(), ".json"))
-                : "";
-    }
-
-    function setBaseURI(string memory baseURI_) external onlyOwner {
-        _baseTokenURI = baseURI_;
-    }
-
-    function _baseURI() internal view override returns (string memory) {
-        return _baseTokenURI;
     }
 
     function supportsInterface(
