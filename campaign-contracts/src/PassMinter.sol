@@ -21,7 +21,7 @@ contract KoanProtocolPass1155 is
 {
     // AggregatorV3Interface internal dataFeed;
     address public dataFeed;
-    uint256 MINT_PRICE_USD = 50_000_000; //$0.5= 50_000_000/10e8
+    uint256 public mintPriceUsd = 50_000_000; //$0.5= 50_000_000/10e8
 
     mapping(uint256 => bool) public validIds;
     mapping(address => mapping(uint256 => bool)) public hasMintId;
@@ -45,7 +45,7 @@ contract KoanProtocolPass1155 is
         // );
     }
 
-    function setURI(string memory newuri) public onlyOwner {
+    function setUri(string memory newuri) public onlyOwner {
         _setURI(newuri);
     }
 
@@ -74,18 +74,18 @@ contract KoanProtocolPass1155 is
         uint256 id,
         bytes memory data
     ) public payable {
-        uint256 requiredETH = PriceFeed.getETHAmountFromUSD(
+        uint256 requiredEth = PriceFeed.getEthAmountFromUsd(
             dataFeed,
-            MINT_PRICE_USD
+            mintPriceUsd
         );
-        // uint256 requiredETH = getMintPriceETHAmount();
-        require(msg.value >= requiredETH, "Insufficient ETH sent");
+        // uint256 requiredEth = getMintPriceEthAmount();
+        require(msg.value >= requiredEth, "Insufficient ETH sent");
 
         require(validIds[id], "Invalid or inactive event");
 
         require(!hasMintId[msg.sender][id], "You can mint a pass only Once");
 
-        (bool success, ) = payable(owner()).call{value: requiredETH}("");
+        (bool success, ) = payable(owner()).call{value: requiredEth}("");
         require(success, "Payment failed");
 
         _mint(account, id, 1, data);
@@ -93,8 +93,8 @@ contract KoanProtocolPass1155 is
         hasMintId[msg.sender][id] = true;
 
         // Refund excess ETH if any
-        if (msg.value > requiredETH) {
-            payable(msg.sender).transfer(msg.value - requiredETH);
+        if (msg.value > requiredEth) {
+            payable(msg.sender).transfer(msg.value - requiredEth);
         }
 
         emit PassMinted(
@@ -103,7 +103,7 @@ contract KoanProtocolPass1155 is
             id,
             eventNames[id],
             1,
-            requiredETH
+            requiredEth
         );
     }
 
@@ -132,11 +132,11 @@ contract KoanProtocolPass1155 is
         return PriceFeed.getLatestPrice(dataFeed);
     }
 
-    function getMintPriceETHAmount() public view returns (uint256) {
+    function getMintPriceEthAmount() public view returns (uint256) {
         int256 price = PriceFeed.getLatestPrice(dataFeed);
         require(price > 0, "Invalid price from oracle");
 
-        uint256 ethAmount = (MINT_PRICE_USD * 1 ether) / uint256(price);
+        uint256 ethAmount = (mintPriceUsd * 1 ether) / uint256(price);
 
         return ethAmount;
     }

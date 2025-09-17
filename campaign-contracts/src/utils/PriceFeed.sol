@@ -19,7 +19,7 @@ library PriceFeed {
     }
 
     /// @notice Convert USD amount (with 8 decimals) to ETH amount
-    function getETHAmountFromUSD(
+    function getEthAmountFromUsd(
         address feed,
         uint256 usdAmount // e.g. 50_000_000 for $0.5
     ) internal view returns (uint256) {
