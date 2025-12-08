@@ -17,15 +17,14 @@ contract RandomNumberGenerator is VRFConsumerBaseV2Plus {
 
     // Your subscription ID.
     uint256 public sSubscriptionId =
-        72895049009068177567348429920655137314967903829166946862622665089352041121926;
+        107501249889980620307102052039419643184716714136476626081377165000830916800746;
 
     address public koanPlayLottery;
 
     // The gas lane to use, which specifies the maximum gas price to bump to.
     // For a list of available gas lanes on each network,
     // see https://docs.chain.link/vrf/v2-5/supported-networks#configurations
-    bytes32 public sKeyHash =
-        0x00b81b5a830cb0a4009fbd8904de511e28631e62ce5ad231373d3cdad373ccab;
+    bytes32 public sKeyHash;
 
     // Depends on the number of requested values that you want sent to the
     // fulfillRandomWords() function. Storing each word costs about 20,000 gas,
@@ -72,9 +71,11 @@ contract RandomNumberGenerator is VRFConsumerBaseV2Plus {
     }
 
     constructor(
-        address _vrfCoordinator
+        address _vrfCoordinator,
+        bytes32 _keyHash
     ) VRFConsumerBaseV2Plus(_vrfCoordinator) {
         admin = msg.sender;
+        sKeyHash = _keyHash;
     }
 
     function getLotteryWinningNumber() external {

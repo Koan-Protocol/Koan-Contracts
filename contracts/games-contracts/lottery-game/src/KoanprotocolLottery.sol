@@ -28,9 +28,9 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
     uint256 public pendingInjectionNextLottery;
 
     uint256 public constant MIN_DISCOUNT_DIVISOR = 300;
-    uint256 public constant MIN_LENGTH_LOTTERY = 10 minutes - 5 minutes; // 4 hours
-    uint256 public constant MAX_LENGTH_LOTTERY = 12 days + 5 minutes; // 4 days
-    uint256 public constant MAX_TREASURY_FEE = 3000; // 30%
+    uint256 public constant MIN_LENGTH_LOTTERY = 1 days;
+    uint256 public constant MAX_LENGTH_LOTTERY = 3 days;
+    uint256 public constant MAX_TREASURY_FEE = 3000;
 
     IERC20 public paymentToken;
     IRandomNumberGenerator public randomNumberGenerator;
@@ -48,8 +48,8 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
         uint256 endTime;
         uint256 priceTicketInPaymentToken;
         uint256 discountDivisor;
-        uint256[6] rewardsBreakdown; // 0: 1 matching number // 5: 6 matching numbers
-        uint256 treasuryFee; // 500: 5% // 200: 2% // 50: 0.5%
+        uint256[6] rewardsBreakdown;
+        uint256 treasuryFee; 
         uint256[6] rewardsPerBracket;
         uint256[6] countWinnersPerBracket;
         uint256 firstTicketId;
@@ -177,7 +177,7 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
     function buyTickets(
         uint256 _lotteryId,
         uint32[] calldata _ticketNumbers
-    ) external notContract nonReentrant {
+    ) external nonReentrant {
         require(_ticketNumbers.length != 0, "No ticket specified");
         require(
             _ticketNumbers.length <= maxNumberTicketsPerBuyOrClaim,
@@ -265,7 +265,7 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
         uint256 _lotteryId,
         uint256[] calldata _ticketIds,
         uint32[] calldata _brackets
-    ) external notContract nonReentrant {
+    ) external nonReentrant {
         require(_ticketIds.length == _brackets.length, "Not same length");
         require(_ticketIds.length != 0, "Length must be >0");
         require(
