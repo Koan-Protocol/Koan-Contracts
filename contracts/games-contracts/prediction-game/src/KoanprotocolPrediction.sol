@@ -13,7 +13,7 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
 
     AggregatorV3Interface public oracle;
 
-    IERC20 public immutable predictionToken;
+    IERC20 public immutable PREDICTION_TOKEN;
 
     uint256 public genesisLockOnce = 0;
     uint256 public genesisStartOnce = 0;
@@ -139,7 +139,7 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
         address _token,
         address _oracleAddress,
         address _adminAddress,
-        address _operatorAddress,
+        address _operatorAddress, 
         uint256 _intervalSeconds,
         uint256 _bufferSeconds,
         uint256 _minBetAmount,
@@ -148,7 +148,7 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
     ) Ownable(_adminAddress) {
         require(_treasuryFee <= MAX_TREASURY_FEE, "Treasury fee too high");
 
-        predictionToken = IERC20(_token);
+        PREDICTION_TOKEN = IERC20(_token);
         oracle = AggregatorV3Interface(_oracleAddress);
         operatorAddress = _operatorAddress;
         intervalSeconds = _intervalSeconds;
@@ -173,7 +173,7 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
             "Can only bet once per round"
         );
 
-        predictionToken.safeTransferFrom(msg.sender, address(this), _amount);
+        PREDICTION_TOKEN.safeTransferFrom(msg.sender, address(this), _amount);
         // Update round data
         uint256 amount = _amount;
         Round storage round = rounds[epoch];
@@ -208,7 +208,7 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
             "Can only bet once per round"
         );
 
-        predictionToken.safeTransferFrom(msg.sender, address(this), _amount);
+        PREDICTION_TOKEN.safeTransferFrom(msg.sender, address(this), _amount);
         // Update round data
         uint256 amount = _amount;
         Round storage round = rounds[epoch];
@@ -273,7 +273,7 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
         }
 
         if (reward > 0) {
-            predictionToken.safeTransfer(msg.sender, reward);
+            PREDICTION_TOKEN.safeTransfer(msg.sender, reward);
         }
     }
 
@@ -343,7 +343,7 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
     function claimTreasury() external nonReentrant onlyOwner {
         uint256 currentTreasuryAmount = treasuryAmount;
         treasuryAmount = 0;
-        predictionToken.safeTransfer(owner(), currentTreasuryAmount);
+        PREDICTION_TOKEN.safeTransfer(owner(), currentTreasuryAmount);
         emit TreasuryClaim(currentTreasuryAmount);
     }
 
@@ -457,7 +457,7 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      * @dev Callable by owner
      */
     function recoverToken(address _token, uint256 _amount) external onlyOwner {
-        require(_token != address(predictionToken), "Cannot be prediction token address");
+        require(_token != address(PREDICTION_TOKEN), "Cannot be prediction token address");
         IERC20(_token).safeTransfer(address(msg.sender), _amount);
 
         emit TokenRecovery(_token, _amount);
