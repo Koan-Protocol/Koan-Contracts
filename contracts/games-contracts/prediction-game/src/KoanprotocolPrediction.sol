@@ -15,8 +15,8 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
 
     IERC20 public immutable PREDICTION_TOKEN;
 
-    uint256 public genesisLockOnce = 0;
-    uint256 public genesisStartOnce = 0;
+    bool public genesisLockOnce = false;
+    bool public genesisStartOnce = false;
 
     address public operatorAddress;
 
@@ -113,14 +113,34 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
     event Unpause(uint256 indexed epoch);
 
     modifier onlyOperator() {
-        require(msg.sender == operatorAddress, "Not operator");
+        _onlyOperator();
         _;
     }
 
+    function _onlyOperator() internal view {
+        require(msg.sender == operatorAddress, "Not operator");
+    }
+
     modifier notContract() {
+        _notContract();
+        _;
+    }
+
+    function _notContract() internal view {
         require(!_isContract(msg.sender), "Contract not allowed");
         require(msg.sender == tx.origin, "Proxy contract not allowed");
+    }
+
+    modifier onlyAdminOrOperator() {
+        _onlyAdminOrOperator();
         _;
+    }
+
+    function _onlyAdminOrOperator() internal view {
+        require(
+            msg.sender == owner() || msg.sender == operatorAddress,
+            "Not operator/admin"
+        );
     }
 
     /**
@@ -139,7 +159,7 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
         address _token,
         address _oracleAddress,
         address _adminAddress,
-        address _operatorAddress, 
+        address _operatorAddress,
         uint256 _intervalSeconds,
         uint256 _bufferSeconds,
         uint256 _minBetAmount,
@@ -283,10 +303,9 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      */
     function executeRound() external whenNotPaused onlyOperator {
         require(
-            genesisStartOnce > 0 && genesisLockOnce > 0,
+            genesisStartOnce && genesisLockOnce,
             "Can only run after genesisStartRound and genesisLockRound is triggered"
         );
-
         (uint80 currentRoundId, int256 currentPrice) = _getPriceFromOracle();
 
         oracleLatestRoundId = uint256(currentRoundId);
@@ -308,10 +327,10 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
 
     function genesisLockRound() external whenNotPaused onlyOperator {
         require(
-            genesisStartOnce > 0,
+            genesisStartOnce,
             "Can only run after genesisStartRound is triggered"
         );
-        require(genesisLockOnce == 0, "Can only run genesisLockRound once");
+        require(!genesisLockOnce, "Can only run genesisLockRound once");
 
         (uint80 currentRoundId, int256 currentPrice) = _getPriceFromOracle();
 
@@ -321,7 +340,7 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
 
         currentEpoch = currentEpoch + 1;
         _startRound(currentEpoch);
-        genesisLockOnce = block.timestamp;
+        genesisLockOnce = true;
     }
 
     /**
@@ -329,11 +348,11 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      * @dev Callable by admin or operator
      */
     function genesisStartRound() external whenNotPaused onlyOperator {
-        require(genesisStartOnce == 0, "Can only run genesisStartRound once");
+        require(!genesisStartOnce, "Can only run genesisStartRound once");
 
         currentEpoch = currentEpoch + 1;
         _startRound(currentEpoch);
-        genesisStartOnce = block.timestamp;
+        genesisStartOnce = true;
     }
 
     /**
@@ -345,6 +364,29 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
         treasuryAmount = 0;
         PREDICTION_TOKEN.safeTransfer(owner(), currentTreasuryAmount);
         emit TreasuryClaim(currentTreasuryAmount);
+    }
+
+    /**
+     * @notice called by the admin to pause, triggers stopped state
+     * @dev Callable by admin or operator
+     */
+    function pause() external whenNotPaused onlyAdminOrOperator {
+        _pause();
+
+        emit Pause(currentEpoch);
+    }
+
+    /**
+     * @notice called by the admin to unpause, returns to normal state
+     * Reset genesis state. Once paused, the rounds would need to be kickstarted by genesis
+     * @dev Callable by admin or operator
+     */
+    function unpause() external whenPaused onlyAdminOrOperator {
+        genesisStartOnce = false;
+        genesisLockOnce = false;
+        _unpause();
+
+        emit Unpause(currentEpoch);
     }
 
     /**
@@ -457,7 +499,10 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      * @dev Callable by owner
      */
     function recoverToken(address _token, uint256 _amount) external onlyOwner {
-        require(_token != address(PREDICTION_TOKEN), "Cannot be prediction token address");
+        require(
+            _token != address(PREDICTION_TOKEN),
+            "Cannot be prediction token address"
+        );
         IERC20(_token).safeTransfer(address(msg.sender), _amount);
 
         emit TokenRecovery(_token, _amount);
@@ -633,7 +678,7 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
      */
     function _safeStartRound(uint256 epoch) internal {
         require(
-            genesisStartOnce == 0,
+            genesisStartOnce,
             "Can only run after genesisStartRound is triggered"
         );
         require(
@@ -689,6 +734,10 @@ contract KoanprotocolPrediction is Ownable, Pausable, ReentrancyGuard {
             timestamp <= leastAllowedTimestamp,
             "Oracle update exceeded max timestamp allowance"
         );
+        // require(
+        //     timestamp >= block.timestamp - oracleUpdateAllowance,
+        //     "Oracle price is stale"
+        // );
         require(
             uint256(roundId) > oracleLatestRoundId,
             "Oracle update roundId must be larger than oracleLatestRoundId"

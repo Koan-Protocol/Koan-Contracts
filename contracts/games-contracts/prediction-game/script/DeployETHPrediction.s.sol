@@ -4,14 +4,14 @@ pragma solidity ^0.8.13;
 import {Script, console} from "forge-std/Script.sol";
 import {KoanprotocolPrediction} from "../src/KoanprotocolPrediction.sol";
 
-contract DeployBTCPrediction is Script {
+contract DeployETHPrediction is Script {
     // ============ BASE MAINNET ADDRESSES ============
-    // Chainlink BTC/USD Price Feed on Base Mainnet
-    address constant BTC_USD_ORACLE =
-        0x64c911996D3c6aC71f9b455B1E8E7266BcbD848F;
+    // Chainlink ETH/USD Price Feed on Base Mainnet (Standard Proxy)
+    address constant ETH_USD_ORACLE =
+        0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70;
 
     // ============ DEPLOYMENT PARAMETERS ============
-    // Recommended parameters for BTC prediction game
+    // Recommended parameters for ETH prediction game
     uint256 constant INTERVAL_SECONDS = 300; // 5 minutes per round
     uint256 constant BUFFER_SECONDS = 30; // 30 seconds buffer for resolution
     uint256 constant MIN_BET_AMOUNT = 100000; // 0.1 USDC (6 decimals)
@@ -25,21 +25,23 @@ contract DeployBTCPrediction is Script {
         address adminAddress = vm.envAddress("ADMIN_ADDRESS");
         address operatorAddress = vm.envAddress("OPERATOR_ADDRESS");
 
-        console.log("=== Deploying KoanprotocolPrediction on Base Mainnet ===");
+        console.log(
+            "=== Deploying KoanprotocolPrediction for ETH/USD on Base Mainnet ==="
+        );
         console.log("Prediction Token:", predictionToken);
-        console.log("BTC/USD Oracle:", BTC_USD_ORACLE);
+        console.log("ETH/USD Oracle:", ETH_USD_ORACLE);
         console.log("Admin:", adminAddress);
         console.log("Operator:", operatorAddress);
         console.log("Interval:", INTERVAL_SECONDS, "seconds");
         console.log("Buffer:", BUFFER_SECONDS, "seconds");
-        console.log("Min Bet:", MIN_BET_AMOUNT, "wei");
+        console.log("Min Bet:", MIN_BET_AMOUNT, "(0.1 USDC)");
         console.log("Treasury Fee:", TREASURY_FEE, "(3%)");
 
         vm.startBroadcast(deployerPrivateKey);
 
         KoanprotocolPrediction prediction = new KoanprotocolPrediction(
             predictionToken,
-            BTC_USD_ORACLE,
+            ETH_USD_ORACLE,
             adminAddress,
             operatorAddress,
             INTERVAL_SECONDS,
@@ -50,7 +52,10 @@ contract DeployBTCPrediction is Script {
         );
 
         console.log("=== Deployment Complete ===");
-        console.log("KoanprotocolPrediction deployed at:", address(prediction));
+        console.log(
+            "KoanprotocolPrediction (ETH/USD) deployed at:",
+            address(prediction)
+        );
 
         vm.stopBroadcast();
     }
