@@ -64,3 +64,6 @@ artifacts-zk
 cache-zk
 
 deployments/localhost
+
+# Chainlink brownie contracts (submodule libs)
+**/chainlink-brownie-contracts
