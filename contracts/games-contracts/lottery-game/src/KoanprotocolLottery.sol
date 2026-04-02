@@ -28,7 +28,7 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
     uint256 public pendingInjectionNextLottery;
 
     uint256 public constant MIN_DISCOUNT_DIVISOR = 300;
-    uint256 public constant MIN_LENGTH_LOTTERY = 1 days;
+    uint256 public constant MIN_LENGTH_LOTTERY = 5 minutes;
     uint256 public constant MAX_LENGTH_LOTTERY = 3 days;
     uint256 public constant MAX_TREASURY_FEE = 3000;
 
