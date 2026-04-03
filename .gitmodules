@@ -49,3 +49,24 @@
 [submodule "games-contracts/prediction-game/lib/openzeppelin-contracts"]
 	path = games-contracts/prediction-game/lib/openzeppelin-contracts
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+
+[submodule "contracts/games-contracts/foundry-template/lib/openzeppelin-contracts"]
+	path = contracts/games-contracts/foundry-template/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "contracts/games-contracts/foundry-template/lib/forge-std"]
+	path = contracts/games-contracts/foundry-template/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+
+[submodule "contracts/games-contracts/lottery-game/lib/openzeppelin-contracts"]
+	path = contracts/games-contracts/lottery-game/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "contracts/games-contracts/lottery-game/lib/forge-std"]
+	path = contracts/games-contracts/lottery-game/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+[submodule "contracts/games-contracts/prediction-game/lib/forge-std"]
+	path = contracts/games-contracts/prediction-game/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+
+[submodule "contracts/games-contracts/prediction-game/lib/openzeppelin-contracts"]
+	path = contracts/games-contracts/prediction-game/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
